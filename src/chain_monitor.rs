@@ -27,7 +27,7 @@ fn decode_transaction(py: Python, tx_hex: &str) -> PyResult<PyObject> {
     out.set_item("value", tx.value.to_string())?;
     out.set_item("input", format!("0x{}", hex::encode(tx.input)))?;
     out.set_item("hash", format!("{:#x}", tx.hash))?;
-    Ok(out.into_any().unbind().into())
+    Ok(out.into_py(py))
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

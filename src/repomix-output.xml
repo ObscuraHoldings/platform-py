@@ -1,0 +1,454 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+chain_monitor.rs
+execution.rs
+lib.rs
+market_data.rs
+transaction.rs
+cargo.toml
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="chain_monitor.rs">
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use pyo3::exceptions::PyValueError;
+use ethers::types::Transaction;
+use rlp;
+
+#[pyfunction]
+fn decode_transaction(py: Python, tx_hex: &str) -> PyResult<PyObject> {
+    let bytes = hex::decode(tx_hex.trim_start_matches("0x"))
+        .map_err(|e| PyValueError::new_err(format!("invalid hex: {e}")))?;
+    let tx: Transaction = rlp::decode(&bytes)
+        .map_err(|e| PyValueError::new_err(format!("rlp decode failed: {e}")))?;
+
+    let out = PyDict::new(py);
+    out.set_item("from", format!("{:#x}", tx.from))?;
+    if let Some(to) = tx.to {
+        out.set_item("to", format!("{:#x}", to))?;
+    } else {
+        out.set_item("to", Option::<String>::None)?;
+    }
+    out.set_item("nonce", tx.nonce.as_u64())?;
+    
+    // Use strings for big ints to avoid extra features
+    out.set_item("gas", tx.gas.to_string())?;
+    if let Some(p) = tx.gas_price { out.set_item("gas_price", p.to_string())?; }
+    else { out.set_item("gas_price", Option::<String>::None)?; }
+    out.set_item("value", tx.value.to_string())?;
+    out.set_item("input", format!("0x{}", hex::encode(tx.input)))?;
+    out.set_item("hash", format!("{:#x}", tx.hash))?;
+    Ok(out.into_any().unbind().into())
+}
+
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(decode_transaction, m)?)?;
+    Ok(())
+}
+</file>
+
+<file path="execution.rs">
+// execution.rs
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
+
+#[derive(Clone, Debug)]
+struct Token { address: String, symbol: String }
+
+#[derive(Clone, Debug)]
+struct Pool {
+    address: String,
+    token0: Token,
+    token1: Token,
+    fee: u32,
+    liquidity: u128,
+}
+
+struct Route { path: Vec<String>, output_amount: u128 }
+
+#[pyclass]
+pub struct ExecutionEngine {
+    #[pyo3(get)]
+    engine_id: String,
+    pools: Arc<RwLock<HashMap<String, Pool>>>, // address -> Pool
+}
+
+#[pymethods]
+impl ExecutionEngine {
+    #[new]
+    fn new() -> Self {
+        Self {
+            engine_id: uuid::Uuid::new_v4().to_string(),
+            pools: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    #[pyo3(text_signature = "($self, params)")]
+    fn optimize_route(&self, py: Python, params: &Bound<'_, PyDict>) -> PyResult<PyObject> {
+        // Parse inputs
+        let token_in: String = params.get_item("token_in")?
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing 'token_in'"))?
+            .extract()?;
+        let token_out: String = params.get_item("token_out")?
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing 'token_out'"))?
+            .extract()?;
+        let amount_in: u128 = params.get_item("amount_in")?
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing 'amount_in'"))?
+            .extract()?;
+
+        // Compute without the GIL
+        let pools_snapshot: Vec<Pool> = {
+            let guard = self.pools.read().map_err(|_| {
+                pyo3::exceptions::PyRuntimeError::new_err("pools lock poisoned")
+            })?;
+            guard.values().cloned().collect()
+        };
+
+        let route = py.allow_threads(|| {
+            // Dijkstra-like maximization. Use addresses, not symbols.
+            use std::cmp::Ordering;
+            use std::collections::{BinaryHeap, HashMap};
+
+            #[derive(Eq, PartialEq)]
+            struct Node { amt: u128, token: String }
+            impl Ord for Node {
+                fn cmp(&self, other: &Self) -> Ordering { self.amt.cmp(&other.amt) }
+            }
+            impl PartialOrd for Node {
+                fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+            }
+
+            let mut dist: HashMap<String, u128> = HashMap::new();
+            let mut prev: HashMap<String, String> = HashMap::new();
+            let mut pq: BinaryHeap<Node> = BinaryHeap::new();
+
+            dist.insert(token_in.clone(), amount_in);
+            pq.push(Node { amt: amount_in, token: token_in.clone() });
+
+            while let Some(Node { amt, token }) = pq.pop() {
+                if amt < *dist.get(&token).unwrap_or(&0) { continue; }
+
+                for pool in &pools_snapshot {
+                    // Determine direction by matching address or symbol if address missing
+                    let mut nexts = Vec::new();
+                    if pool.token0.address == token || pool.token0.symbol == token {
+                        let out = Self::calculate_amount_out(pool, amt);
+                        nexts.push((&pool.token1, out));
+                    }
+                    if pool.token1.address == token || pool.token1.symbol == token {
+                        let out = Self::calculate_amount_out(pool, amt);
+                        nexts.push((&pool.token0, out));
+                    }
+                    for (nt, out_amt) in nexts {
+                        if out_amt > *dist.get(&nt.address).unwrap_or(&0) {
+                            dist.insert(nt.address.clone(), out_amt);
+                            prev.insert(nt.address.clone(), token.clone());
+                            pq.push(Node { amt: out_amt, token: nt.address.clone() });
+                        }
+                    }
+                }
+            }
+
+            // Reconstruct path by addresses
+            if !dist.contains_key(&token_out) {
+                return None;
+            }
+            let mut path = Vec::new();
+            let mut cur = token_out.clone();
+            while let Some(p) = prev.get(&cur) {
+                path.push(cur.clone());
+                cur = p.clone();
+            }
+            path.push(token_in.clone());
+            path.reverse();
+            Some(Route { path, output_amount: *dist.get(&token_out).unwrap_or(&0) })
+        });
+
+        match route {
+            Some(r) => {
+                let out = PyDict::new(py);
+                let path_list = PyList::new(py, &r.path)?;
+                out.set_item("path", &path_list)?;
+                out.set_item("output_amount", r.output_amount)?;
+                Ok(out.into_any().unbind().into())
+            }
+            None => Ok(py.None()),
+        }
+    }
+
+    #[pyo3(text_signature = "($self, pools_data)")]
+    fn update_pools(&self, _py: Python, pools_data: &Bound<'_, PyList>) -> PyResult<()> {
+        let mut map = self.pools.write().map_err(|_| {
+            pyo3::exceptions::PyRuntimeError::new_err("pools lock poisoned")
+        })?;
+        map.clear();
+        for pool_any in pools_data.iter() {
+            let pool_dict: &Bound<PyDict> = pool_any.downcast()?;
+            let token0_item = pool_dict.get_item("token0")?
+                .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token0"))?;
+            let token0: &Bound<PyDict> = token0_item.downcast()?;
+            let token1_item = pool_dict.get_item("token1")?
+                .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token1"))?;
+            let token1: &Bound<PyDict> = token1_item.downcast()?;
+            let pool = Pool {
+                address: pool_dict.get_item("address")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing address"))?.extract()?,
+                token0: Token {
+                    address: token0.get_item("address")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token0.address"))?.extract()?,
+                    symbol:  token0.get_item("symbol")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token0.symbol"))?.extract()?,
+                },
+                token1: Token {
+                    address: token1.get_item("address")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token1.address"))?.extract()?,
+                    symbol:  token1.get_item("symbol")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token1.symbol"))?.extract()?,
+                },
+                fee: pool_dict.get_item("fee")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing fee"))?.extract()?,
+                liquidity: pool_dict.get_item("liquidity")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing liquidity"))?.extract()?,
+            };
+            map.insert(pool.address.clone(), pool);
+        }
+        Ok(())
+    }
+}
+
+// Pure Rust helper
+impl ExecutionEngine {
+    #[inline]
+    fn calculate_amount_out(pool: &Pool, amount_in: u128) -> u128 {
+        // Replace with correct AMM formula later
+        amount_in.saturating_sub((amount_in as u128 * pool.fee as u128) / 1_000_000u128)
+    }
+}
+
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<ExecutionEngine>()?;
+    Ok(())
+}
+</file>
+
+<file path="lib.rs">
+// lib.rs
+use once_cell::sync::{Lazy, OnceCell};
+use tokio::runtime::{Builder, Runtime};
+use pyo3::prelude::*;
+
+mod execution;
+mod chain_monitor;
+mod market_data;
+mod transaction;
+
+static GLOBAL_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    Builder::new_multi_thread()
+        .enable_all()
+        .thread_name("platform-rt")
+        .max_blocking_threads(1024)
+        .build()
+        .expect("tokio runtime")
+});
+
+static TRACING_INIT: OnceCell<()> = OnceCell::new();
+
+#[pyfunction]
+pub fn initialize_rust_runtime() -> PyResult<()> {
+    // Idempotent, no env-filter feature required
+    let _ = TRACING_INIT.get_or_init(|| {
+        let _ = tracing_subscriber::fmt::try_init();
+        ()
+    });
+    Lazy::force(&GLOBAL_RUNTIME);
+    Ok(())
+}
+
+#[inline]
+pub fn runtime_handle() -> &'static tokio::runtime::Handle {
+    GLOBAL_RUNTIME.handle()
+}
+
+#[pymodule]
+fn platform_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(initialize_rust_runtime, m)?)?;
+    execution::register(m)?;
+    chain_monitor::register(m)?;
+    market_data::register(m)?;
+    transaction::register(m)?;
+    Ok(())
+}
+</file>
+
+<file path="market_data.rs">
+// market_data.rs
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
+use pyo3::exceptions::{PyTypeError, PyKeyError};
+
+#[pyfunction]
+pub fn aggregate_order_books(py: Python, books: &Bound<'_, PyList>) -> PyResult<PyObject> {
+    let mut bids: Vec<(i64, i64)> = Vec::new();
+    let mut asks: Vec<(i64, i64)> = Vec::new();
+
+    for any in books.iter() {
+        let d: &Bound<PyDict> = any.downcast()?;
+        let side: String = d.get_item("side")?
+            .ok_or_else(|| PyKeyError::new_err("missing 'side'"))?
+            .extract()?;
+        let price: i64 = d.get_item("price")?
+            .ok_or_else(|| PyKeyError::new_err("missing 'price'"))?
+            .extract()?;
+        let size: i64 = d.get_item("size")?
+            .ok_or_else(|| PyKeyError::new_err("missing 'size'"))?
+            .extract()?;
+        match side.as_str() {
+            "bid" => bids.push((price, size)),
+            "ask" => asks.push((price, size)),
+            _ => return Err(PyTypeError::new_err("side must be 'bid' or 'ask'")),
+        }
+    }
+    // simple aggregate by price
+    use std::collections::BTreeMap;
+    let mut bid_map = BTreeMap::new();
+    let mut ask_map = BTreeMap::new();
+    for (p, s) in bids { *bid_map.entry(p).or_insert(0) += s; }
+    for (p, s) in asks { *ask_map.entry(p).or_insert(0) += s; }
+
+    let out = PyDict::new(py);
+    let bids_vec: Vec<(i64, i64)> = bid_map.into_iter().collect();
+    let asks_vec: Vec<(i64, i64)> = ask_map.into_iter().collect();
+    let bids_list = PyList::new(py, &bids_vec)?;
+    let asks_list = PyList::new(py, &asks_vec)?;
+    out.set_item("bids", &bids_list)?;
+    out.set_item("asks", &asks_list)?;
+    Ok(out.into_any().unbind().into())
+}
+
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(aggregate_order_books, m)?)?;
+    Ok(())
+}
+</file>
+
+<file path="transaction.rs">
+// transaction.rs
+use pyo3::prelude::*;
+use pyo3::types::PyList;
+
+#[pyclass]
+pub struct TransactionBatcher { max_batch_size: usize }
+
+#[pymethods]
+impl TransactionBatcher {
+    #[new]
+    #[pyo3(signature = (max_batch_size=None))]
+    fn new(max_batch_size: Option<usize>) -> Self {
+        Self { max_batch_size: max_batch_size.unwrap_or(100) }
+    }
+
+    fn batch_transactions(&self, py: Python, transactions: Vec<String>) -> PyResult<PyObject> {
+        let chunks: Vec<Vec<String>> = transactions
+            .chunks(self.max_batch_size)
+            .map(|c| c.to_vec())
+            .collect();
+        let py_list = PyList::new(py, chunks)?;
+        Ok(py_list.into_any().unbind().into())
+    }
+}
+
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<TransactionBatcher>()?;
+    Ok(())
+}
+</file>
+
+<file path="cargo.toml">
+[package]
+name = "platform_rust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "platform_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23.3", features = ["extension-module", "abi3-py39"] }
+tokio = { version = "1.42.0", features = ["full"] }
+# Use the unified ethers crate; remove redundant subcrates
+ethers = { version = "2.0" }
+rayon = "1.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = { version = "1.11", features = ["v4"] }
+
+# High-performance data structures
+dashmap = "6.1"
+crossbeam = "0.8"
+parking_lot = "0.12"
+
+# Web3 and crypto
+hex = "0.4"
+rlp = "0.5"
+sha3 = "0.10"
+once_cell = "1.18"
+
+# Async runtime
+futures = "0.3"
+async-trait = "0.1"
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+
+# Build Instructions:
+# For development: maturin develop
+# For release: maturin develop --release
+# Or use make commands: make build (release) or make build-debug
+
+</file>
+
+</files>

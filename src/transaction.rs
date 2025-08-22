@@ -18,8 +18,8 @@ impl TransactionBatcher {
             .chunks(self.max_batch_size)
             .map(|c| c.to_vec())
             .collect();
-        let py_list = PyList::new(py, chunks)?;
-        Ok(py_list.into_any().unbind().into())
+        let py_list = PyList::new(py, chunks);
+        Ok(py_list.into_py(py))
     }
 }
 

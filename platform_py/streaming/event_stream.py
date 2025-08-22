@@ -12,6 +12,7 @@ import nats
 from nats.js import JetStreamContext
 from nats.errors import TimeoutError as NatsTimeoutError, NoServersError
 import redis.asyncio as redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 from dataclasses import dataclass, field
 
 from ..config import config
@@ -88,7 +89,7 @@ class EventStream:
             self._is_initialized = True
             logger.info("EventStream initialized successfully")
 
-        except (NatsTimeoutError, NoServersError, redis.exceptions.ConnectionError) as e:
+        except (NatsTimeoutError, NoServersError, RedisConnectionError) as e:
             logger.error("Failed to initialize EventStream", error=str(e), exc_info=True)
             raise
 
@@ -101,7 +102,6 @@ class EventStream:
                 retention=self.stream_config.retention_policy,
                 max_age=self.stream_config.max_age_seconds,
                 storage="file",
-                replicas=1 # For local dev; increase for production
             )
             logger.info("JetStream stream created or updated", name=stream.config.name)
         except Exception as e:

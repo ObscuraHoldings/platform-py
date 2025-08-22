@@ -3,16 +3,8 @@ import sys
 import pytest
 import importlib.util
 
-# Override the standard library 'platform' module with our local package
-repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-platform_init = os.path.join(repo_root, 'platform', '__init__.py')
-spec = importlib.util.spec_from_file_location('platform', platform_init)
-package_platform = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(package_platform)
-sys.modules['platform'] = package_platform
-
-# Now import our rust_bindings from the local platform package
-from platform.rust_bindings import decode_transaction, optimize_route, aggregate_order_books
+# Import rust_bindings from the canonical package
+from platform_py.rust_bindings import decode_transaction, optimize_route, aggregate_order_books
 
 
 class DummyTx(dict):

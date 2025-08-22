@@ -11,7 +11,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import setup_event_loop
+from .setup_event_loop import setup_event_loop
 from .config import config
 
 

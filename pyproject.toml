@@ -52,11 +52,11 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.7"]
+build-backend = "maturin"
 
 [tool.hatch.build.targets.wheel]
-packages = ["platform"]
+packages = ["platform_py"]
 
 [tool.uv]
 dev-dependencies = [
@@ -101,7 +101,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 
 [tool.coverage.run]
-source = ["platform"]
+source = ["platform_py"]
 omit = ["*/tests/*", "*/test_*.py"]
 
 [tool.coverage.report]
