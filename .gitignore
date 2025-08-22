@@ -1,0 +1,70 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Packages / builds
+build/
+dist/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+
+# Virtual envs / tools
+.venv/
+venv/
+.python-version
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.tox/
+.nox/
+.pyre/
+.pytype/
+
+# Coverage / testing
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+debug.log
+
+# SQLite / local DBs
+*.sqlite3
+*.db
+*.db-journal
+
+# Caches / temp
+.cache/
+tmp/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# --- Rust ---
+# Keep Cargo.lock committed for binaries/libraries
+target/
+
+# --- Docker ---
+docker-compose.override.yml
+.env.docker
+
+# --- Docs (Sphinx or similar) ---
+docs/_build/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  # TimescaleDB for event sourcing and time-series data
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: platform_timescaledb
+    environment:
+      POSTGRES_DB: platform_events
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: platform_secure_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    command: postgres -c shared_preload_libraries=timescaledb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and state management
+  redis:
+    image: redis:7-alpine
+    container_name: platform_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --appendfsync everysec
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NATS for message passing
+  nats:
+    image: nats:2-alpine
+    container_name: platform_nats
+    ports:
+      - "4222:4222" # Client connections
+      - "8222:8222" # HTTP monitoring
+      - "6222:6222" # Cluster connections
+    command: ["-js", "-m", "8222"] # Enable JetStream
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ray head node for distributed computing
+  ray-head:
+    image: rayproject/ray:latest
+    container_name: platform_ray_head
+    ports:
+      - "8265:8265" # Ray Dashboard
+      - "10001:10001" # Ray Client Server
+      - "6380:6379" # Ray Redis port (different from main Redis)
+    environment:
+      RAY_SCHEDULER_EVENTS: "1"
+    command: ray start --head --dashboard-host=0.0.0.0 --ray-client-server-port=10001
+    healthcheck:
+      test: ["CMD", "ray", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # # Optional: Ray worker node (can scale horizontally)
+  # ray-worker:
+  #   image: rayproject/ray:latest
+  #   container_name: platform_ray_worker
+  #   depends_on:
+  #     - ray-head
+  #   environment:
+  #     RAY_HEAD_ADDRESS: "ray-head:10001"
+  #   command: ray start --address=ray-head:6379
+  #   deploy:
+  #     replicas: 2  # Start with 2 workers
+
+volumes:
+  timescale_data:
+  redis_data:
+
+networks:
+  default:
+    name: platform_network
+    driver: bridge

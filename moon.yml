@@ -1,0 +1,151 @@
+# platform-py/moon.yml
+$schema: "https://moonrepo.dev/schemas/project.json"
+
+type: "application"
+language: "python"
+toolchain:
+  default: "system"
+
+# File groups for Python + Rust hybrid
+fileGroups:
+  python_sources:
+    - "platform/**/*.py"
+    - "main.py"
+    - "pyproject.toml"
+    - "uv.lock"
+  rust_sources:
+    - "src/**/*.rs"
+    - "Cargo.toml"
+    - "Cargo.lock"
+  configs:
+    - "config.yaml"
+    - "*.toml"
+    - "*.cfg"
+  tests:
+    - "tests/**/*.py"
+    - "platform/**/test_*.py"
+
+tasks:
+  # Install Python dependencies (using UV for speed)
+  install:
+    command: "uv sync"
+    inputs:
+      - "pyproject.toml"
+      - "uv.lock"
+    outputs:
+      - ".venv"
+    options:
+      cache: true
+
+  # Build Rust extensions (for performance-critical components)
+  build-rust:
+    command: "cargo build --release"
+    inputs:
+      - "@group(rust_sources)"
+    outputs:
+      - "target/release"
+    options:
+      cache: true
+    env:
+      RUSTFLAGS: "-C target-cpu=native -C opt-level=3"
+
+  # Build Python package (includes Rust extensions)
+  build:
+    command: "uv run python -m build"
+    inputs:
+      - "@group(python_sources)"
+      - "@group(rust_sources)"
+    outputs:
+      - "dist"
+    deps:
+      - "install"
+      - "build-rust"
+    options:
+      cache: true
+
+  # Run Python tests
+  test:
+    command: "uv run pytest -v"
+    inputs:
+      - "@group(python_sources)"
+      - "@group(tests)"
+    deps:
+      - "install"
+    options:
+      cache: true
+
+  # Type checking with mypy
+  typecheck:
+    command: "uv run mypy platform/"
+    inputs:
+      - "@group(python_sources)"
+    deps:
+      - "install"
+
+  # Linting with ruff
+  lint:
+    command: "uv run ruff check platform/"
+    inputs:
+      - "@group(python_sources)"
+    deps:
+      - "install"
+
+  # Format with ruff
+  format:
+    command: "uv run ruff format platform/"
+    inputs:
+      - "@group(python_sources)"
+    deps:
+      - "install"
+
+  # Security check
+  security:
+    command: "uv run bandit -r platform/"
+    inputs:
+      - "@group(python_sources)"
+    deps:
+      - "install"
+
+  # Performance benchmarks
+  benchmark:
+    command: "uv run python performance/benchmark.py"
+    local: true
+    deps:
+      - "build"
+
+  # Development server
+  dev:
+    command: "uv run python main.py"
+    local: true
+    deps:
+      - "install"
+      - "build-rust"
+    env:
+      PYTHONPATH: "."
+      DEVELOPMENT: "true"
+
+  # Production server
+  start:
+    command: "uv run python main.py"
+    local: true
+    deps:
+      - "build"
+    env:
+      PYTHONPATH: "."
+      PRODUCTION: "true"
+
+  # Clean build artifacts
+  clean:
+    command: "rm -rf dist/ target/ .pytest_cache/ __pycache__/ .ruff_cache/"
+    local: true
+
+  # Rust-specific tasks
+  clippy:
+    command: "cargo clippy -- -D warnings"
+    inputs:
+      - "@group(rust_sources)"
+
+  fmt-rust:
+    command: "cargo fmt --check"
+    inputs:
+      - "@group(rust_sources)"
