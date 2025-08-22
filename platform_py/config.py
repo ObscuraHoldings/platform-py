@@ -3,7 +3,7 @@ Platform configuration management using Pydantic Settings.
 """
 
 from typing import List, Optional, Dict
-from pydantic import BaseSettings, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings as PydanticBaseSettings
 
 
@@ -12,12 +12,12 @@ class DatabaseConfig(PydanticBaseSettings):
     
     host: str = Field(default="localhost", description="Database host")
     port: int = Field(default=5432, description="Database port")
-    database: str = Field(default="platform", description="Database name")
+    database: str = Field(default="platform_events", description="Database name")
     username: str = Field(default="platform", description="Database username")
-    password: str = Field(default="platform", description="Database password")
-    pool_size: int = Field(default=10, description="Connection pool size")
-    max_overflow: int = Field(default=20, description="Max pool overflow")
-    max_size: int = Field(default=20, description="Maximum pool size (use instead of max_overflow)")
+    password: str = Field(default="platform_secure_pass", description="Database password")
+    pool_size: int = Field(default=20, description="Connection pool size")
+    max_overflow: int = Field(default=10, description="Max pool overflow")
+    max_size: int = Field(default=30, description="Maximum pool size (use instead of max_overflow)")
     
     @property
     def url(self) -> str:
@@ -32,7 +32,8 @@ class RedisConfig(PydanticBaseSettings):
     port: int = Field(default=6379, description="Redis port")
     db: int = Field(default=0, description="Redis database number")
     password: Optional[str] = Field(default=None, description="Redis password")
-    max_connections: int = Field(default=20, description="Max connections")
+    max_connections: int = Field(default=50, description="Max connections")
+    decode_responses: bool = Field(default=True, description="Return strings instead of bytes from redis client")
     
     @property
     def url(self) -> str:
@@ -52,10 +53,10 @@ class NATSConfig(PydanticBaseSettings):
 class RayConfig(PydanticBaseSettings):
     """Ray distributed computing configuration."""
     
-    address: Optional[str] = Field(default=None, description="Ray cluster address")
-    num_cpus: Optional[int] = Field(default=None, description="Number of CPUs to use")
-    num_gpus: Optional[int] = Field(default=None, description="Number of GPUs to use")
-    object_store_memory: Optional[int] = Field(default=None, description="Object store memory")
+    address: Optional[str] = Field(default="ray://localhost:10001", description="Ray cluster address")
+    num_cpus: Optional[int] = Field(default=4, description="Number of CPUs to use")
+    num_gpus: Optional[int] = Field(default=0, description="Number of GPUs to use")
+    object_store_memory: Optional[int] = Field(default=2147483648, description="Object store memory")
 
 
 class MLConfig(PydanticBaseSettings):
@@ -91,6 +92,8 @@ class PlatformConfig(PydanticBaseSettings):
     max_intent_queue_size: int = Field(default=10000, description="Maximum intent queue size")
     intent_processing_timeout: float = Field(default=30.0, description="Intent processing timeout")
     event_buffer_size: int = Field(default=1000, description="Event buffer size")
+    # Feature flags
+    enable_legacy_intent_queue: bool = Field(default=False, description="Enable legacy intent queue processor")
     
     class Config:
         env_prefix = "PLATFORM_"

@@ -6,6 +6,7 @@ import asyncio
 import structlog
 from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
+import json
 
 import asyncpg
 
@@ -17,6 +18,7 @@ from ...types import (
 from ...streaming import EventStream
 from .validator import IntentValidator
 from .processor import DistributedIntentPipeline
+from .prioritizer import MLPrioritizer
 
 logger = structlog.get_logger()
 
@@ -27,13 +29,18 @@ class IntentManager:
     def __init__(self, 
                  db_pool: asyncpg.Pool, 
                  event_stream: EventStream,
-                 ml_prioritizer: Optional[MLPrioritizer] = None):
+                 ml_prioritizer: Optional[MLPrioritizer] = None,
+                 risk_engine: Optional["RiskEngine"] = None,
+                 enable_legacy_queue: bool = False):
         
         self.db_pool = db_pool
         self.event_stream = event_stream
         self.validator = IntentValidator(db_pool)
         self.ml_prioritizer = ml_prioritizer
         self.pipeline = DistributedIntentPipeline()
+        self.risk_engine = risk_engine
+        self._enable_legacy_queue = enable_legacy_queue
+        self._seq_by_corr: Dict[str, int] = {}
         
         self._intent_queue = asyncio.PriorityQueue()
         self._processing_task: Optional[asyncio.Task] = None
@@ -45,8 +52,11 @@ class IntentManager:
         """Initialize IntentManager and start processing loop."""
         self._running = True
         await self.pipeline.initialize_processors()
-        self._processing_task = asyncio.create_task(self._process_intent_queue())
-        logger.info("IntentManager processing started")
+        if self._enable_legacy_queue:
+            self._processing_task = asyncio.create_task(self._process_intent_queue())
+            logger.info("IntentManager processing started (legacy queue enabled)")
+        else:
+            logger.info("IntentManager initialized (event-driven; legacy queue disabled)")
     
     async def shutdown(self) -> None:
         """Shut down IntentManager gracefully."""
@@ -85,18 +95,45 @@ class IntentManager:
                 intent.priority = max(intent.priority, ml_priority)
                 logger.info("Intent prioritized with ML", intent_id=str(intent.id), priority=intent.priority)
             
-            # 3. Store submission event
-            event = create_intent_submitted_event(intent, metadata)
-            await self._store_event(event)
-            
-            # 4. Publish submission event
-            await self.event_stream.publish(
-                subject=f"intent.submitted.{intent.type.value}",
-                event=event.dict()
+            # 3. Publish submission envelope (single-writer persistence by StateCoordinator)
+            env = self._mk_env(
+                topic="intent.submitted",
+                correlation_id=f"intent:{intent.id}",
+                payload={"intentId": str(intent.id), "intent": intent.dict()},
             )
+            await self.event_stream.publish_envelope(env)
+
+            # 4. Risk evaluation and gating
+            if self.risk_engine is not None:
+                decision = await self.risk_engine.evaluate_risk(intent)
+                if decision.approved:
+                    ra = self._mk_env(
+                        topic="risk.approved",
+                        correlation_id=f"intent:{intent.id}",
+                        causation_id=env.eventId,
+                        payload={"intentId": str(intent.id)},
+                    )
+                    await self.event_stream.publish_envelope(ra)
+
+                    ia = self._mk_env(
+                        topic="intent.accepted",
+                        correlation_id=f"intent:{intent.id}",
+                        causation_id=ra.eventId,
+                        payload={"intentId": str(intent.id)},
+                    )
+                    await self.event_stream.publish_envelope(ia)
+                else:
+                    rr = self._mk_env(
+                        topic="risk.rejected",
+                        correlation_id=f"intent:{intent.id}",
+                        causation_id=env.eventId,
+                        payload={"intentId": str(intent.id), "reason": decision.get("reason")},
+                    )
+                    await self.event_stream.publish_envelope(rr)
             
-            # 5. Add to processing queue
-            await self._intent_queue.put((-intent.priority, intent)) # Use negative for min-heap as priority queue
+            # 5. Legacy queue (disabled by default). In V1, planning is event-driven.
+            if self._enable_legacy_queue:
+                await self._intent_queue.put((-intent.priority, intent))
             
             logger.info("Intent submitted successfully", intent_id=str(intent.id), priority=intent.priority)
             
@@ -129,19 +166,16 @@ class IntentManager:
                 # Update status to processing
                 intent.update_status(IntentStatus.PROCESSING)
                 
-                # Create and store status change event
-                metadata = EventMetadata(source_service="IntentManager", source_version="1.0.0") # Placeholder
-                status_event = create_intent_status_changed_event(
-                    intent_id=intent.id, 
-                    old_status=IntentStatus.QUEUED, 
-                    new_status=IntentStatus.PROCESSING, 
-                    metadata=metadata,
-                    aggregate_version=current_version + 1
+                # Publish status change envelope (no direct DB writes)
+                status_env = self._mk_env(
+                    topic="intent.status_changed",
+                    payload={
+                        "intentId": str(intent.id),
+                        "old": IntentStatus.QUEUED.value,
+                        "new": IntentStatus.PROCESSING.value,
+                    },
                 )
-                await self._store_event(status_event)
-                
-                # Publish status change event
-                await self.event_stream.publish(f"intent.status.{intent.id}", status_event.dict())
+                await self.event_stream.publish_envelope(status_env)
                 
                 # Hand off to distributed execution pipeline
                 sub_intents = await self.pipeline.process_intents([intent])
@@ -165,34 +199,25 @@ class IntentManager:
                 await asyncio.sleep(1) # Avoid tight loop on repeated errors
     
     async def _store_event(self, event: Event) -> None:
-        """Store event in TimescaleDB event store."""
-        query = """
-            INSERT INTO events (
-                id, event_type, event_version, aggregate_id, aggregate_type, 
-                aggregate_version, business_timestamp, system_timestamp, 
-                payload, metadata, signature, signer_public_key, hash
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        """Deprecated in V1 path: single-writer persistence by StateCoordinator.
+
+        Kept for backward compatibility with legacy projections; avoid new calls.
         """
-        async with self.db_pool.acquire() as conn:
-            await conn.execute(
-                query,
-                event.id,
-                event.event_type,
-                event.event_version,
-                event.aggregate_id,
-                event.aggregate_type,
-                event.aggregate_version,
-                event.business_timestamp,
-                event.system_timestamp,
-                event.payload.json(),
-                event.metadata.json(),
-                event.signature,
-                event.signer_public_key,
-                event.hash
-            )
-        logger.debug("Event stored in database", event_id=str(event.id), event_type=event.event_type)
-    
+        logger.debug("_store_event called (legacy path)", event_type=getattr(event, "event_type", "unknown"))
+
+    def _mk_env(self, *, topic: str, correlation_id: str, payload: Dict[str, Any], causation_id: Optional[str] = None):
+        from ...types.envelope import envelope
+        # naive per-process monotonic sequence per correlation id (V1 helper)
+        seq = self._seq_by_corr.get(correlation_id, 0) + 1
+        self._seq_by_corr[correlation_id] = seq
+        return envelope(
+            topic=topic,
+            payload=payload,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+            sequence=seq,
+        )
+        
     async def _get_aggregate_version(self, aggregate_id: UUID) -> int:
         """Get the latest version of an aggregate."""
         query = "SELECT MAX(aggregate_version) FROM events WHERE aggregate_id = $1"

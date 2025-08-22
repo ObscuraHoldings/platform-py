@@ -3,11 +3,11 @@ API endpoints for intent management.
 """
 
 import structlog
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import List
 
-from ..types import Intent, IntentReceipt, IntentUpdate, EventMetadata
+from ..types import Intent, IntentReceipt, IntentUpdate, EventMetadata, IntentStatus
 from ..dependencies import components
 
 router = APIRouter(
@@ -28,7 +28,7 @@ async def submit_intent(intent: Intent, background_tasks: BackgroundTasks):
     metadata = EventMetadata(
         source_service="api",
         source_version="0.1.0",
-        correlation_id=UUID(),
+        correlation_id=uuid4(),
     )
     
     receipt = await components.intent_manager.submit_intent(intent, metadata)

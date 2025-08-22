@@ -8,6 +8,7 @@ dependencies = [
     # Core async libraries
     "uvloop>=0.21.0",
     "aiohttp>=3.10.10",
+    "cryptography==45.0.6",
     
     # Web3 and blockchain
     "web3>=7.6.0",

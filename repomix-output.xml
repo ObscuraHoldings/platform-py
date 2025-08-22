@@ -1,0 +1,1712 @@
+<repomix><file_summary>This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix.
+The content has been processed where comments have been removed, empty lines have been removed, content has been formatted for parsing in xml style, content has been compressed (code blocks are separated by ⋮---- delimiter).<purpose>This file contains a packed representation of a subset of the repository&apos;s contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.</purpose><file_format>The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Repository files, each consisting of:
+  - File path as an attribute
+  - Full contents of the file</file_format><usage_guidelines>- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+- Pay special attention to the Repository Description. These contain important context and guidelines specific to this project.</usage_guidelines><notes>- Some files may have been excluded based on .gitignore rules and Repomix&apos;s configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: src/**/*, Platform/**/*
+- Files matching these patterns are excluded: **/*.log, additional-folder, **/*.pyc, **/*.pyo, **/*.pyd, **/*.pyw, **/*.pyz, **/*.pywz, .docs/**/*
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Code comments have been removed from supported file types
+- Empty lines have been removed from all files
+- Content has been formatted for parsing in xml style
+- Content has been compressed - code blocks are separated by ⋮---- delimiter
+- Files are sorted by Git change count (files with more changes are at the bottom)</notes></file_summary><user_provided_header>Strategy Execution Platform: Consolidated repository output for LLM analysis.</user_provided_header><directory_structure>Platform/
+  agent/
+    __init__.py
+    coordination.py
+    framework.py
+  api/
+    __init__.py
+    intent.py
+    strategy.py
+  chain_monitor/
+    __init__.py
+    watcher.py
+  core/
+    execution/
+      __init__.py
+      planner.py
+      venue_manager.py
+    intent/
+      __init__.py
+      manager.py
+      prioritizer.py
+      processor.py
+      validator.py
+    market/
+      __init__.py
+      adapter.py
+      uniswap_v3.py
+    __init__.py
+  governance/
+    __init__.py
+    gateway.py
+    policy.py
+  market/
+    __init__.py
+    adapters.py
+  monitoring/
+    __init__.py
+    metrics.py
+  risk/
+    __init__.py
+    circuit_breaker.py
+    engine.py
+  settlement/
+    __init__.py
+    manager.py
+    netting.py
+  state/
+    __init__.py
+    coordinator.py
+    reconciliation.py
+  strategies/
+    examples/
+      __init__.py
+      momentum.py
+    __init__.py
+    base.py
+  streaming/
+    __init__.py
+    event_stream.py
+  types/
+    __init__.py
+    common.py
+    events.py
+    intent.py
+    rust_bridge.py
+  __init__.py
+  app.py
+  config.py
+  dependencies.py
+  rust_bindings.py
+  services.py
+src/
+  chain_monitor.rs
+  execution.rs
+  lib.rs
+  market_data.rs
+  transaction.rs</directory_structure><files>This section contains the contents of the repository&apos;s files.<file path="Platform/agent/__init__.py">__all__ = [&quot;AgentFramework&quot;, &quot;CoordinationService&quot;]</file><file path="Platform/agent/coordination.py">class CoordinationService
+⋮----
+def __init__(self)
+async def acquire_lock(self, lock_name: str) -&gt; bool
+async def release_lock(self, lock_name: str)</file><file path="Platform/agent/framework.py">class AgentFramework
+⋮----
+def __init__(self)
+async def authenticate_agent(self, agent_id: str, credentials: Dict[str, Any]) -&gt; bool
+async def authorize_action(self, agent_id: str, action: str, resource: str) -&gt; bool</file><file path="Platform/api/__init__.py">api_router = APIRouter()</file><file path="Platform/api/intent.py">router = APIRouter(
+logger = structlog.get_logger()
+⋮----
+@router.post(&quot;/submit&quot;, response_model=IntentReceipt)
+async def submit_intent(intent: Intent, background_tasks: BackgroundTasks)
+⋮----
+metadata = EventMetadata(
+receipt = await components.intent_manager.submit_intent(intent, metadata)
+⋮----
+async def process()
+⋮----
+processed_intents = await components.intent_pipeline.process_intents([intent])
+⋮----
+@router.get(&quot;/{intent_id}/status&quot;, response_model=IntentUpdate)
+async def get_intent_status(intent_id: UUID)
+⋮----
+status = await components.intent_manager.get_intent_status(intent_id)
+⋮----
+@router.get(&quot;/{intent_id}/history&quot;)
+async def get_intent_history(intent_id: UUID)
+⋮----
+history = await components.intent_manager.get_intent_history(intent_id)</file><file path="Platform/api/strategy.py">class StrategyManager
+⋮----
+def __init__(self)
+def get_all_strategies(self) -&gt; List[Dict[str, Any]]
+def get_strategy(self, strategy_id: UUID) -&gt; Any
+strategy_manager = StrategyManager()
+router = APIRouter(
+logger = structlog.get_logger()
+⋮----
+@router.get(&quot;/&quot;, response_model=List[Dict[str, Any]])
+async def list_strategies()
+⋮----
+@router.get(&quot;/{strategy_id}/health&quot;)
+async def get_strategy_health(strategy_id: UUID)
+⋮----
+strategy = await strategy_manager.get_strategy(strategy_id)
+⋮----
+@router.post(&quot;/{strategy_id}/pause&quot;)
+async def pause_strategy(strategy_id: UUID)
+⋮----
+@router.post(&quot;/{strategy_id}/resume&quot;)
+async def resume_strategy(strategy_id: UUID)</file><file path="Platform/chain_monitor/__init__.py">__all__ = [&quot;ChainWatcher&quot;]</file><file path="Platform/chain_monitor/watcher.py">logger = structlog.get_logger()
+class ChainWatcher
+⋮----
+def __init__(self, chain_id: int, event_stream: EventStream)
+def _get_rpc_url(self) -&gt; str
+async def start(self)
+async def stop(self)
+async def _poll_for_events(self)
+⋮----
+last_processed_block = await asyncio.to_thread(self.w3.eth.get_block_number) - 1
+⋮----
+latest_block = await asyncio.to_thread(self.w3.eth.get_block_number)
+⋮----
+block = await asyncio.to_thread(self.w3.eth.get_block, block_number, full_transactions=True)
+⋮----
+class DecodedTxPayload(EventPayload)
+⋮----
+def get_event_type(self) -&gt; str: return &quot;transaction.decoded&quot;
+raw_hex = await asyncio.to_thread(self._try_get_raw_tx_hex, tx)
+decoded_tx = decode_transaction(raw_hex if raw_hex else tx)
+event = Event(
+⋮----
+last_processed_block = block_number
+⋮----
+def _try_get_raw_tx_hex(self, tx: Any) -&gt; Optional[str]
+⋮----
+tx_hash = tx.hash if hasattr(tx, &quot;hash&quot;) else tx.get(&quot;hash&quot;)
+⋮----
+raw = self.w3.eth.get_raw_transaction(tx_hash)</file><file path="Platform/core/execution/__init__.py">__all__ = [&quot;ExecutionPlanner&quot;, &quot;ExecutionPlan&quot;, &quot;VenueManager&quot;]</file><file path="Platform/core/execution/planner.py">logger = structlog.get_logger()
+class ExecutionPlan
+⋮----
+def __init__(self, intent_id: UUID)
+class ExecutionPlanner
+⋮----
+def __init__(self, venue_manager: VenueManager, ml_cost_model: Optional[Any] = None)
+async def create_plan(self, intent: Intent) -&gt; ExecutionPlan
+⋮----
+plan = ExecutionPlan(intent.id)
+⋮----
+simulation_results = await self._simulate_plan(plan)
+⋮----
+async def _decompose_into_steps(self, intent: Intent) -&gt; List[Dict[str, Any]]
+⋮----
+steps = []
+⋮----
+async def _estimate_step_costs(self, plan: ExecutionPlan, intent: Intent) -&gt; None
+⋮----
+total_cost = 0
+⋮----
+cost = await self.ml_cost_model.predict(step, intent.ml_features)
+⋮----
+cost = self._heuristic_cost_estimation(step)
+⋮----
+def _heuristic_cost_estimation(self, step: Dict[str, Any]) -&gt; float
+async def _simulate_plan(self, plan: ExecutionPlan) -&gt; Dict[str, Any]
+⋮----
+simulation_results = {
+⋮----
+sim_result = await asyncio.to_thread(simulate_transaction, step)
+⋮----
+def _finalize_plan(self, plan: ExecutionPlan, simulation_results: Dict[str, Any]) -&gt; None
+async def _optimize_routing(self, plan: ExecutionPlan, intent: Intent) -&gt; None
+⋮----
+params = {
+⋮----
+quote_asset = Asset(**step[&apos;asset&apos;])
+venue = Venue(step[&apos;venue&apos;])
+pair = TradingPair(base=intent.primary_asset, quote=quote_asset, venue=venue)
+liquidity = await self.venue_manager.get_liquidity_for_pair(pair)
+⋮----
+route = await asyncio.to_thread(optimize_route, params)</file><file path="Platform/core/execution/venue_manager.py">class VenueManager
+⋮----
+def __init__(self)
+async def initialize(self)
+⋮----
+uniswap_v3 = UniswapV3Adapter()
+⋮----
+eth_pairs = await uniswap_v3.get_trading_pairs(1)
+⋮----
+weth_usdc_pair = eth_pairs[0]
+⋮----
+async def get_liquidity_for_pair(self, pair: TradingPair) -&gt; Optional[Dict[str, Any]]
+async def update_liquidity(self, pair: TradingPair, liquidity_data: Dict[str, Any])</file><file path="Platform/core/intent/__init__.py">__all__ = [</file><file path="Platform/core/intent/manager.py">logger = structlog.get_logger()
+class IntentManager
+⋮----
+async def initialize(self) -&gt; None
+async def shutdown(self) -&gt; None
+async def submit_intent(self, intent: Intent, metadata: EventMetadata) -&gt; IntentReceipt
+⋮----
+ml_priority = await self.ml_prioritizer.calculate_priority(intent)
+⋮----
+event = create_intent_submitted_event(intent, metadata)
+⋮----
+async def _process_intent_queue(self) -&gt; None
+⋮----
+current_version = await self._get_aggregate_version(intent.id)
+⋮----
+metadata = EventMetadata(source_service=&quot;IntentManager&quot;, source_version=&quot;1.0.0&quot;)
+status_event = create_intent_status_changed_event(
+⋮----
+sub_intents = await self.pipeline.process_intents([intent])
+⋮----
+async def _store_event(self, event: Event) -&gt; None
+⋮----
+query = &quot;&quot;&quot;
+⋮----
+async def _get_aggregate_version(self, aggregate_id: UUID) -&gt; int
+⋮----
+query = &quot;SELECT MAX(aggregate_version) FROM events WHERE aggregate_id = $1&quot;
+⋮----
+version = await conn.fetchval(query, aggregate_id)
+⋮----
+async def get_intent_status(self, intent_id: UUID) -&gt; Optional[Dict[str, Any]]
+⋮----
+row = await conn.fetchrow(query, intent_id)
+⋮----
+async def get_intent_history(self, intent_id: UUID) -&gt; List[Event]
+⋮----
+rows = await conn.fetch(query, intent_id)
+events = []
+⋮----
+payload_dict = json.loads(row[&apos;payload&apos;])
+metadata_dict = json.loads(row[&apos;metadata&apos;])
+⋮----
+class GenericPayload(EventPayload)
+⋮----
+def get_event_type(self) -&gt; str: return row[&apos;event_type&apos;]
+event = Event(
+⋮----
+def get_queue_size(self) -&gt; int</file><file path="Platform/core/intent/prioritizer.py">logger = structlog.get_logger()
+class MLPrioritizer
+⋮----
+def __init__(self, model_path: str, gpu_enabled: bool = False)
+async def initialize(self) -&gt; None
+⋮----
+providers = [&apos;CUDAExecutionProvider&apos;] if self.gpu_enabled else [&apos;CPUExecutionProvider&apos;]
+⋮----
+async def calculate_priority(self, intent: Intent) -&gt; int
+⋮----
+features = self._prepare_features(intent.ml_features.dict())
+input_name = self.model.get_inputs()[0].name
+result = self.model.run(None, {input_name: features})
+priority_score = float(result[0][0])
+priority = int(priority_score * 10)
+⋮----
+def _prepare_features(self, features: Dict[str, Any]) -&gt; Any
+⋮----
+feature_vector = list(features.values())</file><file path="Platform/core/intent/processor.py">logger = structlog.get_logger()
+⋮----
+@ray.remote(num_cpus=config.ray.num_cpus, num_gpus=config.ray.num_gpus)
+class IntentProcessor
+⋮----
+def __init__(self, processor_id: str)
+async def initialize(self) -&gt; None
+⋮----
+model_path = config.ml.model_cache_dir + &quot;/intent_decomposer.onnx&quot;
+⋮----
+providers = [&apos;CUDAExecutionProvider&apos;] if config.ray.num_gpus &gt; 0 else [&apos;CPUExecutionProvider&apos;]
+⋮----
+async def process_intent(self, intent: Intent) -&gt; List[Intent]
+⋮----
+sub_intents = await self._decompose_intent(intent)
+optimized_intents = []
+⋮----
+optimized = await self._optimize_intent(sub_intent)
+⋮----
+async def _fallback_processing(self, intent: Intent) -&gt; List[Intent]
+⋮----
+sub_intents = []
+⋮----
+sub_intent = intent.copy(deep=True)
+⋮----
+async def _decompose_intent(self, intent: Intent) -&gt; List[Intent]
+⋮----
+features = self._prepare_decomposition_features(intent)
+input_name = self.ml_decomposer.get_inputs()[0].name
+result = self.ml_decomposer.run(None, {input_name: features})
+⋮----
+def _prepare_decomposition_features(self, intent: Intent) -&gt; Any
+⋮----
+features = [len(intent.assets), intent.priority]
+⋮----
+fixed_size = 50
+⋮----
+features = features[:fixed_size]
+⋮----
+def _create_sub_intents_from_ml(self, original_intent: Intent, ml_result: Any) -&gt; List[Intent]
+⋮----
+# For now, we&apos;ll just split the assets into individual intents
+⋮----
+sub_intent = original_intent.copy(deep=True)
+⋮----
+async def _optimize_intent(self, intent: Intent) -&gt; Intent
+class DistributedIntentPipeline
+⋮----
+def __init__(self, num_processors: int = 4)
+async def initialize_processors(self) -&gt; None
+⋮----
+futures = [processor.initialize.remote() for processor in self.processors]
+⋮----
+async def process_intents(self, intents: List[Intent]) -&gt; List[Intent]
+⋮----
+futures = []
+⋮----
+processor = self.processors[i % self.num_processors]
+⋮----
+results = await asyncio.gather(*futures)
+all_sub_intents = [sub_intent for sub_intent_list in results for sub_intent in sub_intent_list]
+⋮----
+async def shutdown(self) -&gt; None
+def get_cluster_status(self) -&gt; Dict[str, Any]</file><file path="Platform/core/intent/validator.py">logger = structlog.get_logger()
+class IntentValidator
+⋮----
+def __init__(self, db_pool: asyncpg.Pool)
+async def validate(self, intent: Intent) -&gt; Tuple[List[str], List[str]]
+⋮----
+errors: List[str] = []
+warnings: List[str] = []
+validation_checks = [
+⋮----
+def _validate_basic_constraints(self, intent: Intent) -&gt; Tuple[List[str], List[str]]
+def _validate_asset_specifications(self, intent: Intent) -&gt; Tuple[List[str], List[str]]
+⋮----
+chain_ids = {spec.asset.chain_id for spec in intent.assets}
+⋮----
+def _validate_venue_constraints(self, intent: Intent) -&gt; Tuple[List[str], List[str]]
+⋮----
+chain_id = intent.primary_asset.chain_id
+supported_venues = self.supported_venues_by_chain.get(chain_id, [])
+⋮----
+def _validate_gas_costs(self, intent: Intent) -&gt; Tuple[List[str], List[str]]
+async def _validate_against_portfolio(self, intent: Intent) -&gt; Tuple[List[str], List[str]]</file><file path="Platform/core/market/__init__.py">__all__ = [&quot;VenueAdapter&quot;, &quot;UniswapV3Adapter&quot;]</file><file path="Platform/core/market/adapter.py">class VenueAdapter(ABC)
+⋮----
+@abstractmethod
+    async def get_name(self) -&gt; str
+⋮----
+@abstractmethod
+    async def get_supported_chains(self) -&gt; List[int]
+⋮----
+@abstractmethod
+    async def get_trading_pairs(self, chain_id: int) -&gt; List[TradingPair]
+⋮----
+@abstractmethod
+    async def get_price(self, pair: TradingPair) -&gt; Price
+⋮----
+@abstractmethod
+    async def get_order_book(self, pair: TradingPair, depth: int = 20) -&gt; OrderBook
+⋮----
+@abstractmethod
+    async def submit_order(self, order: Dict[str, Any]) -&gt; Dict[str, Any]
+⋮----
+@abstractmethod
+    async def get_order_status(self, order_id: str) -&gt; Dict[str, Any]</file><file path="Platform/core/market/uniswap_v3.py">class MockWeb3Provider
+⋮----
+SQRT_PRICE_X96 = 4295128739 * (2**96)
+async def get_pool_data(self, pool_address: str) -&gt; Dict[str, Any]
+class UniswapV3Adapter(VenueAdapter)
+⋮----
+def __init__(self)
+async def get_name(self) -&gt; str
+async def get_supported_chains(self) -&gt; List[int]
+async def get_trading_pairs(self, chain_id: int) -&gt; List[TradingPair]
+async def get_price(self, pair: TradingPair) -&gt; Price
+⋮----
+provider = self.web3_providers.get(pair.base.chain_id)
+⋮----
+pool_data = await provider.get_pool_data(pair.pool_address)
+sqrt_price = int(pool_data[&apos;sqrtPriceX96&apos;])
+price_ratio = (sqrt_price / 2**96)**2
+price_val = price_ratio * (10**pair.base.decimals / 10**pair.quote.decimals)
+⋮----
+async def get_order_book(self, pair: TradingPair, depth: int = 20) -&gt; OrderBook
+⋮----
+price = await self.get_price(pair)
+⋮----
+async def submit_order(self, order: Dict[str, Any]) -&gt; Dict[str, Any]
+async def get_order_status(self, order_id: str) -&gt; Dict[str, Any]</file><file path="Platform/core/__init__.py">__all__ = []</file><file path="Platform/governance/__init__.py">__all__ = [&quot;GovernanceGateway&quot;, &quot;PolicyEngine&quot;]</file><file path="Platform/governance/gateway.py">class GovernanceGateway
+⋮----
+def __init__(self)
+async def create_proposal(self, proposal_data: Dict[str, Any]) -&gt; str
+async def get_proposal_status(self, proposal_id: str) -&gt; Optional[str]</file><file path="Platform/governance/policy.py">class PolicyEngine
+⋮----
+def __init__(self)
+async def check_policy(self, action: str, resource: str, context: Dict[str, Any]) -&gt; bool</file><file path="Platform/market/__init__.py">__all__ = [&quot;VenueAdapter&quot;, &quot;UniswapV3Adapter&quot;]</file><file path="Platform/market/adapters.py">logger = structlog.get_logger()
+class VenueAdapter(ABC)
+⋮----
+@abstractmethod
+    async def get_order_book(self, pair: TradingPair) -&gt; Optional[OrderBook]
+⋮----
+@abstractmethod
+    async def get_liquidity(self, pair: TradingPair) -&gt; Optional[Dict[str, Any]]
+class UniswapV3Adapter(VenueAdapter)
+⋮----
+async def get_order_book(self, pair: TradingPair) -&gt; Optional[OrderBook]
+async def get_liquidity(self, pair: TradingPair) -&gt; Optional[Dict[str, Any]]</file><file path="Platform/monitoring/__init__.py">__all__ = [&quot;intents_submitted&quot;, &quot;intents_completed&quot;, &quot;intent_processing_time&quot;, &quot;strategy_pnl&quot;, &quot;strategy_active_intents&quot;, &quot;system_errors&quot;]</file><file path="Platform/monitoring/metrics.py">intents_submitted = Counter(&apos;intents_submitted_total&apos;, &apos;Total number of submitted intents&apos;, [&apos;strategy_id&apos;])
+intents_completed = Counter(&apos;intents_completed_total&apos;, &apos;Total number of completed intents&apos;, [&apos;strategy_id&apos;, &apos;status&apos;])
+intent_processing_time = Gauge(&apos;intent_processing_time_seconds&apos;, &apos;Time to process an intent&apos;, [&apos;strategy_id&apos;])
+strategy_pnl = Gauge(&apos;strategy_pnl_total&apos;, &apos;Profit and loss for a strategy&apos;, [&apos;strategy_id&apos;])
+strategy_active_intents = Gauge(&apos;strategy_active_intents&apos;, &apos;Number of active intents for a strategy&apos;, [&apos;strategy_id&apos;])
+system_errors = Counter(&apos;system_errors_total&apos;, &apos;Total number of system errors&apos;, [&apos;service&apos;])</file><file path="Platform/risk/__init__.py">__all__ = [&quot;RiskEngine&quot;, &quot;CircuitBreaker&quot;]</file><file path="Platform/risk/circuit_breaker.py">class CircuitBreaker
+⋮----
+def __init__(self)
+async def check_and_trip(self) -&gt; bool
+def is_tripped(self) -&gt; bool
+def reset(self)</file><file path="Platform/risk/engine.py">class RiskEngine
+⋮----
+def __init__(self)
+async def evaluate_risk(self, intent: Intent) -&gt; Optional[Dict[str, Any]]
+async def check_limits(self, intent: Intent) -&gt; bool</file><file path="Platform/settlement/__init__.py">__all__ = [&quot;SettlementManager&quot;, &quot;NettingEngine&quot;]</file><file path="Platform/settlement/manager.py">class SettlementManager
+⋮----
+def __init__(self)
+async def queue_for_settlement(self, trade_id: str, trade_data: Dict[str, Any])
+async def process_settlements(self)</file><file path="Platform/settlement/netting.py">class NettingEngine
+⋮----
+def __init__(self)
+async def net_positions(self) -&gt; Dict[str, Any]</file><file path="Platform/state/__init__.py">__all__ = [&quot;StateCoordinator&quot;, &quot;ReconciliationService&quot;]</file><file path="Platform/state/coordinator.py">class StateCoordinator
+⋮----
+def __init__(self)
+async def apply_event(self, event: Event)
+async def get_state(self, aggregate_id: str) -&gt; Optional[Dict[str, Any]]</file><file path="Platform/state/reconciliation.py">class ReconciliationService
+⋮----
+def __init__(self)
+async def reconcile_state(self)</file><file path="Platform/strategies/examples/__init__.py">__all__ = [</file><file path="Platform/strategies/examples/momentum.py">logger = structlog.get_logger()
+class MomentumFeatures
+⋮----
+@staticmethod
+    def calculate_momentum_features(price_data: pl.DataFrame, lookback_periods: int = 20) -&gt; Dict[str, float]
+⋮----
+df = price_data.with_columns([
+latest = df.tail(1).to_dicts()[0]
+price_momentum = (latest[&quot;price&quot;] - latest[&quot;ma_20&quot;]) / latest[&quot;ma_20&quot;] if latest[&quot;ma_20&quot;] else 0
+volume_ratio = latest[&quot;volume&quot;] / latest[&quot;volume_ma_20&quot;] if latest[&quot;volume_ma_20&quot;] else 1
+volatility_ratio = latest[&quot;vol_10d&quot;] / latest[&quot;vol_20d&quot;] if latest[&quot;vol_20d&quot;] else 1
+ma_trend = 0
+⋮----
+ma_trend = 1
+⋮----
+ma_trend = -1
+⋮----
+@staticmethod
+    def _calculate_rsi(price_data: pl.DataFrame, period: int = 14) -&gt; float
+⋮----
+gains = df.filter(pl.col(&quot;price_change&quot;) &gt; 0).select(&quot;price_change&quot;).sum().item()
+losses = -df.filter(pl.col(&quot;price_change&quot;) &lt; 0).select(&quot;price_change&quot;).sum().item()
+⋮----
+rs = gains / losses
+rsi = 100 - (100 / (1 + rs))
+⋮----
+class RiskScorer
+⋮----
+def __init__(self, strategy: &apos;MomentumStrategy&apos;)
+async def calculate_risk_score(self, features: Dict[str, float], position_size: float) -&gt; float
+⋮----
+ml_result = await self.strategy.predict_with_model(&quot;models/risk_scorer.onnx&quot;, features)
+⋮----
+def _heuristic_risk_score(self, features: Dict[str, float], position_size: float) -&gt; float
+⋮----
+risk_score = 0.0
+vol_risk = min(features.get(&quot;volatility_ratio&quot;, 1.0), 3.0) / 3.0
+⋮----
+size_risk = min(position_size, 0.2) / 0.2
+⋮----
+momentum = features.get(&quot;price_momentum&quot;, 0)
+⋮----
+volume_ratio = features.get(&quot;volume_ratio&quot;, 1.0)
+⋮----
+rsi = features.get(&quot;rsi&quot;, 50)
+⋮----
+class MomentumStrategy(BaseStrategy)
+⋮----
+def __init__(self, strategy_id: UUID, config: Dict[str, Any])
+⋮----
+manifest = StrategyManifest(
+⋮----
+async def _on_initialize(self) -&gt; None
+⋮----
+asset_symbol = asset_config.get(&quot;symbol&quot;, &quot;UNKNOWN&quot;)
+⋮----
+async def generate_intents(self, market_data: Dict[str, Any]) -&gt; List[Intent]
+⋮----
+intents = []
+⋮----
+should_rebalance = (datetime.utcnow() - self._last_rebalance) &gt; self.rebalance_frequency
+# Generate signals for each target asset
+⋮----
+asset_symbol = asset_config.get(&quot;symbol&quot;)
+⋮----
+# Generate intent for this asset
+intent = await self._generate_asset_intent(asset_symbol, asset_config, should_rebalance)
+⋮----
+async def _generate_asset_intent(self, asset_symbol: str, asset_config: Dict[str, Any], force_rebalance: bool) -&gt; Optional[Intent]
+⋮----
+price_data = self._price_history[asset_symbol]
+⋮----
+# Calculate features
+features = MomentumFeatures.calculate_momentum_features(price_data, self.lookback_periods)
+⋮----
+# Get ML signal
+signal_strength = await self._predict_signal(features)
+risk_score = await self.risk_scorer.calculate_risk_score(features, self.max_position_size)
+# Create ML features object
+ml_features = MLFeatures(
+# Decision logic
+should_trade = (signal_strength &gt; self.signal_threshold and
+⋮----
+# Create asset and amount
+asset = Asset(
+# Determine trade direction and size
+trade_amount = self._calculate_trade_amount(signal_strength, risk_score, asset_config)
+⋮----
+# Create intent
+intent_type = IntentType.ACQUIRE if signal_strength &gt; 0.5 else IntentType.DISPOSE
+intent = Intent(
+⋮----
+async def _predict_signal(self, features: Dict[str, float]) -&gt; float
+⋮----
+result = await self.predict_with_model(&quot;models/momentum_signal.onnx&quot;, features)
+⋮----
+def _heuristic_signal(self, features: Dict[str, float]) -&gt; float
+⋮----
+signal = 0.5
+⋮----
+ma_trend = features.get(&quot;ma_trend&quot;, 0)
+⋮----
+def _calculate_trade_amount(self, signal_strength: float, risk_score: float, asset_config: Dict[str, Any]) -&gt; float
+⋮----
+base_amount = self.max_position_size
+signal_adjustment = (signal_strength - 0.5) * 2
+risk_adjustment = 1.0 - risk_score
+target_weight = asset_config.get(&quot;target_weight&quot;, base_amount)
+trade_amount = target_weight * signal_adjustment * risk_adjustment
+⋮----
+async def _update_price_history(self, market_data: Dict[str, Any]) -&gt; None
+⋮----
+timestamp = datetime.utcnow()
+⋮----
+asset_data = market_data[asset_symbol]
+new_row = pl.DataFrame({
+⋮----
+async def update_ml_models(self, new_data: Dict[str, Any]) -&gt; None
+async def evaluate_market_conditions(self, market_data: Dict[str, Any]) -&gt; Dict[str, float]
+⋮----
+conditions = {
+⋮----
+total_momentum = 0.0
+total_volatility = 0.0
+asset_count = 0
+⋮----
+features = MomentumFeatures.calculate_momentum_features(price_data)
+⋮----
+avg_momentum = total_momentum / asset_count
+avg_volatility = total_volatility / asset_count
+⋮----
+regime_features = {
+regime_result = await self.predict_with_model(&quot;models/market_regime.onnx&quot;, regime_features)
+⋮----
+backtest_state = {
+train_end = start_date + (end_date - start_date) * 0.7
+current_date = start_date
+portfolio_value = 10000.0
+peak_value = portfolio_value
+⋮----
+daily_data = {}
+⋮----
+day_data = data.filter(
+⋮----
+latest = day_data.tail(1).to_dicts()[0]
+⋮----
+intents = await self.generate_intents(daily_data)
+⋮----
+trade_result = self._simulate_trade_execution(intent, daily_data)
+⋮----
+daily_return = (portfolio_value - peak_value) / peak_value if peak_value &gt; 0 else 0
+⋮----
+drawdown = (peak_value - portfolio_value) / peak_value
+⋮----
+total_return = (portfolio_value - 10000.0) / 10000.0
+returns_array = np.array(backtest_state[&quot;daily_returns&quot;])
+sharpe_ratio = (np.mean(returns_array) / np.std(returns_array) * np.sqrt(252)
+⋮----
+def _simulate_trade_execution(self, intent: Intent, market_data: Dict[str, Any]) -&gt; Dict[str, Any]
+⋮----
+asset_spec = intent.assets[0]
+asset_symbol = asset_spec.asset.symbol
+⋮----
+price = market_data[asset_symbol][&quot;price&quot;]
+slippage = 0.001
+fees = 0.0005
+trade_return = 0.0
+⋮----
+trade_return = -slippage - fees</file><file path="Platform/strategies/__init__.py">__all__ = [</file><file path="Platform/strategies/base.py">logger = structlog.get_logger()
+⋮----
+@dataclass
+class StrategyManifest
+⋮----
+name: str
+version: str
+description: str
+ml_models: List[str] = field(default_factory=list)
+model_cache_dir: Optional[str] = None
+gpu_memory_mb: Optional[int] = None
+cpu_cores: Optional[int] = None
+max_memory_mb: Optional[int] = None
+dependencies: List[str] = field(default_factory=list)
+config_schema: Dict[str, Any] = field(default_factory=dict)
+default_config: Dict[str, Any] = field(default_factory=dict)
+max_position_size: Optional[float] = None
+max_daily_loss: Optional[float] = None
+max_drawdown: Optional[float] = None
+class MLModelManager
+⋮----
+def __init__(self, manifest: StrategyManifest)
+async def initialize(self) -&gt; None
+async def shutdown(self) -&gt; None
+async def _allocate_gpu_resources(self) -&gt; None
+⋮----
+providers = ort.get_available_providers()
+⋮----
+cuda_options = {
+⋮----
+async def _cleanup_gpu_resources(self) -&gt; None
+async def _load_model(self, model_path: str) -&gt; None
+⋮----
+full_path = self._model_cache_dir / model_path
+⋮----
+providers = [self._gpu_context] if self._gpu_context else [&apos;CPUExecutionProvider&apos;]
+session = ort.InferenceSession(str(full_path), providers=providers)
+⋮----
+async def _unload_model(self, model_name: str) -&gt; None
+async def predict(self, model_path: str, features: Dict[str, Any]) -&gt; Dict[str, float]
+⋮----
+session = self._models[model_path]
+input_name = session.get_inputs()[0].name
+input_data = self._prepare_input(features, session)
+start_time = datetime.now()
+result = session.run(None, {input_name: input_data})
+inference_time = (datetime.now() - start_time).total_seconds() * 1000
+output = self._process_output(result, session)
+⋮----
+def _prepare_input(self, features: Dict[str, Any], session) -&gt; Any
+⋮----
+feature_values = list(features.values())
+⋮----
+def _process_output(self, result: List[Any], session) -&gt; Dict[str, float]
+⋮----
+output = {}
+output_names = [output.name for output in session.get_outputs()]
+⋮----
+value = float(result[i][0]) if hasattr(result[i], &apos;__getitem__&apos;) else float(result[i])
+⋮----
+def get_loaded_models(self) -&gt; List[str]
+class StrategyState
+⋮----
+def __init__(self)
+def update_position(self, asset: Asset, amount: AssetAmount) -&gt; None
+def get_position(self, asset: Asset) -&gt; Optional[AssetAmount]
+def add_pending_intent(self, intent_id: UUID) -&gt; None
+def remove_pending_intent(self, intent_id: UUID) -&gt; None
+def get_total_value(self, price_oracle: Callable[[Asset], float]) -&gt; float
+⋮----
+total_value = 0.0
+⋮----
+price = price_oracle(asset)
+⋮----
+class BaseStrategy(ABC)
+⋮----
+def __init__(self, strategy_id: UUID, manifest: StrategyManifest, config: Dict[str, Any])
+⋮----
+async def pause(self) -&gt; None
+async def resume(self) -&gt; None
+⋮----
+@property
+    def is_running(self) -&gt; bool
+⋮----
+@property
+    def uptime(self) -&gt; Optional[float]
+⋮----
+@abstractmethod
+    async def generate_intents(self, market_data: Dict[str, Any]) -&gt; List[Intent]
+⋮----
+@abstractmethod
+    async def update_ml_models(self, new_data: Dict[str, Any]) -&gt; None
+⋮----
+@abstractmethod
+    async def evaluate_market_conditions(self, market_data: Dict[str, Any]) -&gt; Dict[str, float]
+async def _on_initialize(self) -&gt; None
+async def _on_shutdown(self) -&gt; None
+async def _on_pause(self) -&gt; None
+async def _on_resume(self) -&gt; None
+def add_event_handler(self, event_type: str, handler: Callable) -&gt; None
+async def handle_event(self, event_type: str, event_data: Dict[str, Any]) -&gt; None
+async def track_intent_generated(self, intent: Intent) -&gt; None
+async def track_intent_completed(self, intent_id: UUID, success: bool) -&gt; None
+def get_performance_metrics(self) -&gt; Dict[str, Any]
+⋮----
+success_rate = (self._successful_intents / self._total_intents_generated
+⋮----
+def _log_final_metrics(self) -&gt; None
+⋮----
+metrics = self.get_performance_metrics()
+⋮----
+async def predict_with_model(self, model_path: str, features: Dict[str, Any]) -&gt; Dict[str, float]
+async def get_ml_confidence(self, features: Dict[str, Any]) -&gt; float
+⋮----
+predictions = {}
+⋮----
+result = await self.predict_with_model(model_path, features)
+⋮----
+confidences = [v for k, v in predictions.items() if &apos;confidence&apos; in k.lower()]
+⋮----
+def validate_config(self) -&gt; List[str]
+⋮----
+errors = []
+schema = self.manifest.config_schema
+⋮----
+value = self.config[key]
+value_type = requirements.get(&apos;type&apos;)
+⋮----
+async def health_check(self) -&gt; Dict[str, Any]</file><file path="Platform/streaming/__init__.py">__all__ = [&quot;EventStream&quot;, &quot;StreamConfig&quot;]</file><file path="Platform/streaming/event_stream.py">logger = structlog.get_logger()
+⋮----
+@dataclass
+class StreamConfig
+⋮----
+stream_name: str = &quot;platform_events&quot;
+subjects: List[str] = field(default_factory=lambda: [&quot;intent.*&quot;, &quot;strategy.*&quot;, &quot;market.*&quot;, &quot;execution.*&quot;, &quot;system.*&quot;])
+durable_name: str = &quot;platform_worker&quot;
+retention_policy: str = &quot;workqueue&quot;
+max_age_seconds: int = 86400
+class EventStream
+⋮----
+def __init__(self, nats_config=config.nats, redis_config=config.redis, stream_config=StreamConfig())
+async def initialize(self) -&gt; None
+async def _setup_jetstream(self) -&gt; None
+⋮----
+stream = await self.jetstream.add_stream(
+⋮----
+async def shutdown(self) -&gt; None
+async def publish(self, subject: str, event: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -&gt; None
+⋮----
+dedup_id = event.get(&apos;id&apos;, str(UUID()))
+message_data = json.dumps(event).encode(&apos;utf-8&apos;)
+⋮----
+ack = await self.jetstream.publish(
+⋮----
+async def subscribe(self, subject: str, handler: Callable[[Dict[str, Any]], None], durable_name: Optional[str] = None) -&gt; None
+⋮----
+durable = durable_name or f&quot;{self.stream_config.durable_name}_{subject.replace(&apos;.*&apos;, &apos;_wildcard&apos;)}&quot;
+async def message_handler(msg)
+⋮----
+event_data = json.loads(msg.data.decode())
+⋮----
+async def _buffer_in_redis(self, subject: str, event: Dict[str, Any]) -&gt; None
+⋮----
+stream_key = f&quot;events:{subject}&quot;
+pipeline = self.redis_client.pipeline()
+⋮----
+async def get_stream_state(self, stream_name: Optional[str] = None) -&gt; Optional[Dict[str, Any]]
+⋮----
+stream_info = await self.jetstream.stream_info(stream_name or self.stream_config.stream_name)
+⋮----
+async def replay_events_from_redis(self, subject: str, from_timestamp_ms: int, to_timestamp_ms: Optional[int] = None) -&gt; List[Dict[str, Any]]
+⋮----
+start = from_timestamp_ms
+end = to_timestamp_ms or &quot;+&quot;
+results = await self.redis_client.xrange(stream_key, start, end)
+⋮----
+async def _nats_error_cb(self, e)
+async def _nats_reconnected_cb(self)
+async def _nats_disconnected_cb(self)
+async def _nats_closed_cb(self)</file><file path="Platform/types/__init__.py">_EVENTS_AVAILABLE = True
+⋮----
+_EVENTS_AVAILABLE = False
+__all__ = [</file><file path="Platform/types/common.py">class Chain(Enum)
+⋮----
+ETHEREUM = 1
+ARBITRUM = 42161
+BASE = 8453
+POLYGON = 137
+OPTIMISM = 10
+SEPOLIA = 11155111
+⋮----
+@property
+    def name_str(self) -&gt; str
+⋮----
+@property
+    def is_testnet(self) -&gt; bool
+class Venue(Enum)
+⋮----
+UNISWAP_V3 = &quot;uniswap_v3&quot;
+UNISWAP_V2 = &quot;uniswap_v2&quot;
+CURVE = &quot;curve&quot;
+BALANCER = &quot;balancer&quot;
+SUSHISWAP = &quot;sushiswap&quot;
+PANCAKESWAP = &quot;pancakeswap&quot;
+⋮----
+@property
+    def supports_concentrated_liquidity(self) -&gt; bool
+class Asset(BaseModel)
+⋮----
+symbol: str = Field(..., min_length=1, max_length=10, description=&quot;Asset symbol&quot;)
+address: str = Field(..., pattern=r&apos;^0x[a-fA-F0-9]{40}$&apos;, description=&quot;Contract address&quot;)
+decimals: int = Field(..., ge=0, le=77, description=&quot;Token decimals&quot;)
+chain_id: int = Field(..., gt=0, description=&quot;Blockchain network ID&quot;)
+name: Optional[str] = Field(None, max_length=100, description=&quot;Asset name&quot;)
+coingecko_id: Optional[str] = Field(None, description=&quot;CoinGecko API ID&quot;)
+⋮----
+@validator(&apos;address&apos;)
+    def validate_checksum_address(cls, v: str) -&gt; str
+⋮----
+@validator(&apos;chain_id&apos;)
+    def validate_supported_chain(cls, v: int) -&gt; int
+⋮----
+supported_chains = [chain.value for chain in Chain]
+⋮----
+@property
+    def chain(self) -&gt; Chain
+⋮----
+@property
+    def unique_id(self) -&gt; str
+def __hash__(self) -&gt; int
+def __eq__(self, other) -&gt; bool
+class Config
+⋮----
+frozen = True
+class TradingPair(BaseModel)
+⋮----
+base: Asset = Field(..., description=&quot;Base asset&quot;)
+quote: Asset = Field(..., description=&quot;Quote asset&quot;)
+venue: Venue = Field(..., description=&quot;Trading venue&quot;)
+pool_address: Optional[str] = Field(None, pattern=r&apos;^0x[a-fA-F0-9]{40}$&apos;, description=&quot;Pool contract address&quot;)
+fee_tier: Optional[int] = Field(None, ge=0, description=&quot;Fee tier in basis points&quot;)
+⋮----
+@root_validator(skip_on_failure=True)
+    def validate_same_chain(cls, values)
+⋮----
+base = values.get(&apos;base&apos;)
+quote = values.get(&apos;quote&apos;)
+⋮----
+@validator(&apos;pool_address&apos;)
+    def validate_pool_address(cls, v: Optional[str]) -&gt; Optional[str]
+⋮----
+@property
+    def symbol(self) -&gt; str
+⋮----
+@property
+    def chain_id(self) -&gt; int
+⋮----
+class AssetAmount(BaseModel)
+⋮----
+asset: Asset = Field(..., description=&quot;Asset reference&quot;)
+amount: Decimal = Field(..., ge=0, description=&quot;Amount in asset units&quot;)
+⋮----
+@validator(&apos;amount&apos;)
+    def validate_amount_precision(cls, v: Decimal, values: Dict[str, Any]) -&gt; Decimal
+⋮----
+asset = values.get(&apos;asset&apos;)
+⋮----
+decimal_places = abs(v.as_tuple().exponent)
+⋮----
+@property
+    def raw_amount(self) -&gt; int
+⋮----
+@classmethod
+    def from_raw(cls, asset: Asset, raw_amount: int) -&gt; &apos;AssetAmount&apos;
+⋮----
+amount = Decimal(raw_amount) / (10 ** asset.decimals)
+⋮----
+def __add__(self, other: &apos;AssetAmount&apos;) -&gt; &apos;AssetAmount&apos;
+def __sub__(self, other: &apos;AssetAmount&apos;) -&gt; &apos;AssetAmount&apos;
+⋮----
+result_amount = self.amount - other.amount
+⋮----
+def __mul__(self, scalar: Decimal) -&gt; &apos;AssetAmount&apos;
+def __truediv__(self, scalar: Decimal) -&gt; &apos;AssetAmount&apos;
+def __str__(self) -&gt; str
+class Price(BaseModel)
+⋮----
+pair: TradingPair = Field(..., description=&quot;Trading pair&quot;)
+price: Decimal = Field(..., gt=0, description=&quot;Price (quote per base)&quot;)
+timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Price timestamp&quot;)
+source: str = Field(..., description=&quot;Price source&quot;)
+⋮----
+@property
+    def inverse_price(self) -&gt; Decimal
+def convert_amount(self, amount: AssetAmount) -&gt; AssetAmount
+⋮----
+# Convert base to quote
+quote_amount = amount.amount * self.price
+⋮----
+# Convert quote to base
+base_amount = amount.amount / self.price
+⋮----
+class OrderBook(BaseModel)
+⋮----
+bids: List[Tuple[Decimal, Decimal]] = Field(..., description=&quot;List of (price, quantity) for bids&quot;)
+asks: List[Tuple[Decimal, Decimal]] = Field(..., description=&quot;List of (price, quantity) for asks&quot;)
+timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Order book timestamp&quot;)
+⋮----
+@property
+    def best_bid(self) -&gt; Optional[Decimal]
+⋮----
+@property
+    def best_ask(self) -&gt; Optional[Decimal]
+⋮----
+@property
+    def spread(self) -&gt; Optional[Decimal]
+⋮----
+best_bid = self.best_bid
+best_ask = self.best_ask
+⋮----
+@property
+    def mid_price(self) -&gt; Optional[Decimal]
+def get_depth(self, side: str, price_levels: int = 10) -&gt; List[Tuple[Decimal, Decimal]]
+def get_liquidity_at_price(self, price: Decimal, side: str) -&gt; Decimal
+⋮----
+levels = self.bids if side.lower() == &apos;bid&apos; else self.asks
+⋮----
+# Common asset definitions for major chains
+WETH_ETHEREUM = Asset(
+USDC_ETHEREUM = Asset(
+WETH_ARBITRUM = Asset(
+USDC_ARBITRUM = Asset(
+class BaseEntity(BaseModel)
+⋮----
+id: UUID = Field(default_factory=uuid4, description=&quot;Unique identifier&quot;)
+created_at: datetime = Field(default_factory=datetime.utcnow, description=&quot;Creation timestamp&quot;)
+updated_at: Optional[datetime] = Field(None, description=&quot;Last update timestamp&quot;)
+def touch(self) -&gt; None
+class TimestampedEntity(BaseModel)
+⋮----
+timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Timestamp&quot;)
+block_number: Optional[int] = Field(None, ge=0, description=&quot;Blockchain block number&quot;)
+transaction_hash: Optional[str] = Field(None, pattern=r&apos;^0x[a-fA-F0-9]{64}$&apos;, description=&quot;Transaction hash&quot;)
+⋮----
+@validator(&apos;transaction_hash&apos;)
+    def validate_tx_hash(cls, v: Optional[str]) -&gt; Optional[str]
+class ValidationMixin
+⋮----
+@classmethod
+    def validate_percentage(cls, v: Decimal, field_name: str = &quot;percentage&quot;) -&gt; Decimal
+⋮----
+@classmethod
+    def validate_positive_decimal(cls, v: Decimal, field_name: str = &quot;value&quot;) -&gt; Decimal
+ASSET_REGISTRY: Dict[str, Asset] = {
+def get_asset_by_key(key: str) -&gt; Optional[Asset]
+def get_asset_by_address(address: str, chain_id: int) -&gt; Optional[Asset]
+def create_trading_pair(base_key: str, quote_key: str, venue: Venue) -&gt; Optional[TradingPair]
+⋮----
+base = get_asset_by_key(base_key)
+quote = get_asset_by_key(quote_key)</file><file path="Platform/types/events.py">EventPayloadType = TypeVar(&apos;EventPayloadType&apos;, bound=&apos;EventPayload&apos;)
+class EventPayload(BaseModel, ABC)
+⋮----
+class Config
+⋮----
+arbitrary_types_allowed = True
+json_encoders = {
+⋮----
+@abstractmethod
+    def get_event_type(self) -&gt; str
+class EventMetadata(BaseModel)
+⋮----
+source_service: str = Field(..., description=&quot;Service that generated the event&quot;)
+source_version: str = Field(..., description=&quot;Version of the source service&quot;)
+correlation_id: Optional[UUID] = Field(None, description=&quot;Correlation ID for request tracing&quot;)
+causation_id: Optional[UUID] = Field(None, description=&quot;ID of the event that caused this event&quot;)
+user_id: Optional[UUID] = Field(None, description=&quot;User ID if applicable&quot;)
+session_id: Optional[UUID] = Field(None, description=&quot;Session ID if applicable&quot;)
+environment: str = Field(default=&quot;development&quot;, description=&quot;Environment (dev/staging/prod)&quot;)
+additional_data: Dict[str, Any] = Field(default_factory=dict, description=&quot;Additional metadata&quot;)
+class Event(BaseModel)
+⋮----
+id: UUID = Field(default_factory=uuid4, description=&quot;Unique event ID&quot;)
+event_type: str = Field(..., description=&quot;Event type identifier&quot;)
+event_version: int = Field(default=1, description=&quot;Event schema version&quot;)
+aggregate_id: UUID = Field(..., description=&quot;ID of the aggregate this event belongs to&quot;)
+aggregate_type: str = Field(..., description=&quot;Type of the aggregate&quot;)
+aggregate_version: int = Field(..., ge=1, description=&quot;Version of the aggregate after this event&quot;)
+business_timestamp: datetime = Field(..., description=&quot;When the business event occurred&quot;)
+system_timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;When event was recorded&quot;)
+payload: EventPayload = Field(..., description=&quot;Event payload data&quot;)
+metadata: EventMetadata = Field(..., description=&quot;Event metadata&quot;)
+signature: Optional[bytes] = Field(None, description=&quot;Digital signature for audit trail&quot;)
+signer_public_key: Optional[bytes] = Field(None, description=&quot;Public key of the signer&quot;)
+hash: Optional[str] = Field(None, description=&quot;Event content hash&quot;)
+⋮----
+@validator(&apos;business_timestamp&apos;)
+    def validate_business_timestamp(cls, v: datetime) -&gt; datetime
+def get_signing_message(self) -&gt; bytes
+⋮----
+signing_data = {
+⋮----
+def sign(self, private_key: ed25519.Ed25519PrivateKey) -&gt; None
+⋮----
+message = self.get_signing_message()
+⋮----
+hasher = hashes.Hash(hashes.SHA256())
+⋮----
+def verify_signature(self) -&gt; bool
+⋮----
+public_key = ed25519.Ed25519PublicKey.from_public_bytes_raw(self.signer_public_key)
+⋮----
+@property
+    def age(self) -&gt; float
+⋮----
+@property
+    def business_age(self) -&gt; float
+class IntentSubmittedPayload(EventPayload)
+⋮----
+intent_id: UUID = Field(..., description=&quot;Intent ID&quot;)
+strategy_id: UUID = Field(..., description=&quot;Strategy ID&quot;)
+intent_type: str = Field(..., description=&quot;Intent type&quot;)
+intent_data: Dict[str, Any] = Field(..., description=&quot;Complete intent data&quot;)
+def get_event_type(self) -&gt; str
+class IntentValidatedPayload(EventPayload)
+⋮----
+validation_result: bool = Field(..., description=&quot;Validation result&quot;)
+errors: List[str] = Field(default_factory=list, description=&quot;Validation errors&quot;)
+warnings: List[str] = Field(default_factory=list, description=&quot;Validation warnings&quot;)
+ml_score: Optional[float] = Field(None, description=&quot;ML validation score&quot;)
+⋮----
+class IntentStatusChangedPayload(EventPayload)
+⋮----
+old_status: str = Field(..., description=&quot;Previous status&quot;)
+new_status: str = Field(..., description=&quot;New status&quot;)
+reason: Optional[str] = Field(None, description=&quot;Reason for status change&quot;)
+filled_amount: Optional[str] = Field(None, description=&quot;Amount filled (as string for precision)&quot;)
+⋮----
+class IntentExpiredPayload(EventPayload)
+⋮----
+expired_at: datetime = Field(..., description=&quot;Expiration timestamp&quot;)
+partial_fill: bool = Field(..., description=&quot;Whether intent was partially filled&quot;)
+filled_amount: Optional[str] = Field(None, description=&quot;Amount filled before expiration&quot;)
+⋮----
+class StrategyStartedPayload(EventPayload)
+⋮----
+strategy_name: str = Field(..., description=&quot;Strategy name&quot;)
+strategy_version: str = Field(..., description=&quot;Strategy version&quot;)
+configuration: Dict[str, Any] = Field(..., description=&quot;Strategy configuration&quot;)
+ml_models: List[str] = Field(default_factory=list, description=&quot;ML models used&quot;)
+⋮----
+class StrategyStoppedPayload(EventPayload)
+⋮----
+reason: str = Field(..., description=&quot;Reason for shutdown&quot;)
+final_state: Dict[str, Any] = Field(..., description=&quot;Final strategy state&quot;)
+⋮----
+class StrategySignalPayload(EventPayload)
+⋮----
+signal_type: str = Field(..., description=&quot;Signal type&quot;)
+signal_strength: float = Field(..., ge=0, le=1, description=&quot;Signal strength&quot;)
+assets: List[Dict[str, Any]] = Field(..., description=&quot;Assets involved&quot;)
+confidence: Optional[float] = Field(None, description=&quot;ML confidence&quot;)
+features: Dict[str, float] = Field(default_factory=dict, description=&quot;ML features&quot;)
+⋮----
+class PriceUpdatePayload(EventPayload)
+⋮----
+pair: Dict[str, Any] = Field(..., description=&quot;Trading pair data&quot;)
+price: str = Field(..., description=&quot;Price (as string for precision)&quot;)
+volume_24h: Optional[str] = Field(None, description=&quot;24h volume&quot;)
+source: str = Field(..., description=&quot;Price source&quot;)
+confidence: Optional[float] = Field(None, description=&quot;Price confidence&quot;)
+⋮----
+class LiquidityUpdatePayload(EventPayload)
+⋮----
+venue: str = Field(..., description=&quot;Trading venue&quot;)
+total_liquidity: str = Field(..., description=&quot;Total liquidity&quot;)
+depth_data: Dict[str, Any] = Field(..., description=&quot;Order book depth&quot;)
+⋮----
+class OrderSubmittedPayload(EventPayload)
+⋮----
+order_id: UUID = Field(..., description=&quot;Order ID&quot;)
+intent_id: UUID = Field(..., description=&quot;Related intent ID&quot;)
+⋮----
+order_type: str = Field(..., description=&quot;Order type&quot;)
+amount: str = Field(..., description=&quot;Order amount&quot;)
+price: Optional[str] = Field(None, description=&quot;Order price&quot;)
+⋮----
+class OrderFilledPayload(EventPayload)
+⋮----
+fill_amount: str = Field(..., description=&quot;Fill amount&quot;)
+fill_price: str = Field(..., description=&quot;Fill price&quot;)
+gas_used: Optional[int] = Field(None, description=&quot;Gas used&quot;)
+transaction_hash: Optional[str] = Field(None, description=&quot;Transaction hash&quot;)
+⋮----
+class TransactionConfirmedPayload(EventPayload)
+⋮----
+transaction_hash: str = Field(..., description=&quot;Transaction hash&quot;)
+block_number: int = Field(..., description=&quot;Block number&quot;)
+gas_used: int = Field(..., description=&quot;Gas used&quot;)
+gas_price: str = Field(..., description=&quot;Gas price&quot;)
+status: str = Field(..., description=&quot;Transaction status&quot;)
+⋮----
+class ModelTrainingStartedPayload(EventPayload)
+⋮----
+model_id: UUID = Field(..., description=&quot;Model ID&quot;)
+model_type: str = Field(..., description=&quot;Model type&quot;)
+training_data_size: int = Field(..., description=&quot;Training data size&quot;)
+hyperparameters: Dict[str, Any] = Field(..., description=&quot;Model hyperparameters&quot;)
+⋮----
+class ModelTrainingCompletedPayload(EventPayload)
+⋮----
+model_path: str = Field(..., description=&quot;Trained model path&quot;)
+metrics: Dict[str, float] = Field(..., description=&quot;Training metrics&quot;)
+training_duration_seconds: float = Field(..., description=&quot;Training duration&quot;)
+⋮----
+class ModelInferencePayload(EventPayload)
+⋮----
+input_features: Dict[str, float] = Field(..., description=&quot;Input features&quot;)
+prediction: Dict[str, float] = Field(..., description=&quot;Model prediction&quot;)
+confidence: float = Field(..., description=&quot;Prediction confidence&quot;)
+inference_time_ms: float = Field(..., description=&quot;Inference time in milliseconds&quot;)
+⋮----
+class SystemStartedPayload(EventPayload)
+⋮----
+service_name: str = Field(..., description=&quot;Service name&quot;)
+version: str = Field(..., description=&quot;Service version&quot;)
+environment: str = Field(..., description=&quot;Environment&quot;)
+configuration: Dict[str, Any] = Field(..., description=&quot;System configuration&quot;)
+⋮----
+class SystemErrorPayload(EventPayload)
+⋮----
+error_type: str = Field(..., description=&quot;Error type&quot;)
+error_message: str = Field(..., description=&quot;Error message&quot;)
+stack_trace: Optional[str] = Field(None, description=&quot;Stack trace&quot;)
+context: Dict[str, Any] = Field(default_factory=dict, description=&quot;Error context&quot;)
+⋮----
+payload = IntentSubmittedPayload(
+⋮----
+payload = IntentStatusChangedPayload(
+⋮----
+payload = StrategySignalPayload(
+⋮----
+class EventFilter(BaseModel)
+⋮----
+aggregate_id: Optional[UUID] = None
+aggregate_type: Optional[str] = None
+event_type: Optional[str] = None
+from_timestamp: Optional[datetime] = None
+to_timestamp: Optional[datetime] = None
+from_version: Optional[int] = None
+to_version: Optional[int] = None
+metadata_filter: Dict[str, Any] = Field(default_factory=dict)
+class EventProjection(BaseModel)
+⋮----
+id: UUID = Field(..., description=&quot;Projection ID&quot;)
+last_processed_event: Optional[UUID] = Field(None, description=&quot;Last processed event ID&quot;)
+last_processed_timestamp: Optional[datetime] = Field(None, description=&quot;Last processed timestamp&quot;)
+version: int = Field(default=1, description=&quot;Projection version&quot;)</file><file path="Platform/types/intent.py">class IntentType(Enum)
+⋮----
+ACQUIRE = &quot;acquire&quot;
+DISPOSE = &quot;dispose&quot;
+REBALANCE = &quot;rebalance&quot;
+HEDGE = &quot;hedge&quot;
+ARBITRAGE = &quot;arbitrage&quot;
+LIQUIDATE = &quot;liquidate&quot;
+class ExecutionStyle(Enum)
+⋮----
+AGGRESSIVE = &quot;aggressive&quot;
+PASSIVE = &quot;passive&quot;
+ADAPTIVE = &quot;adaptive&quot;
+STEALTH = &quot;stealth&quot;
+class IntentStatus(Enum)
+⋮----
+PENDING = &quot;pending&quot;
+VALIDATED = &quot;validated&quot;
+QUEUED = &quot;queued&quot;
+PROCESSING = &quot;processing&quot;
+PARTIALLY_FILLED = &quot;partially_filled&quot;
+COMPLETED = &quot;completed&quot;
+FAILED = &quot;failed&quot;
+CANCELLED = &quot;cancelled&quot;
+EXPIRED = &quot;expired&quot;
+class IntentConstraints(BaseModel)
+⋮----
+max_slippage: Decimal = Field(..., ge=0, le=1, description=&quot;Maximum slippage tolerance (0-1)&quot;)
+time_window_ms: int = Field(..., gt=0, description=&quot;Time window for execution in milliseconds&quot;)
+execution_style: ExecutionStyle = Field(..., description=&quot;Execution style preference&quot;)
+min_fill_size: Optional[Decimal] = Field(None, ge=0, description=&quot;Minimum fill size&quot;)
+max_fill_size: Optional[Decimal] = Field(None, ge=0, description=&quot;Maximum fill size per transaction&quot;)
+max_gas_price_gwei: Optional[Decimal] = Field(None, ge=0, description=&quot;Maximum gas price in Gwei&quot;)
+max_total_gas_cost: Optional[AssetAmount] = Field(None, description=&quot;Maximum total gas cost&quot;)
+allowed_venues: Optional[List[Venue]] = Field(None, description=&quot;Allowed trading venues&quot;)
+excluded_venues: Optional[List[Venue]] = Field(None, description=&quot;Excluded trading venues&quot;)
+enable_mev_protection: bool = Field(default=True, description=&quot;Enable MEV protection&quot;)
+private_mempool: bool = Field(default=False, description=&quot;Use private mempool&quot;)
+ml_model_path: Optional[str] = Field(None, description=&quot;Path to ML model for execution optimization&quot;)
+feature_vector: Optional[List[float]] = Field(None, description=&quot;Feature vector for ML model&quot;)
+confidence_threshold: Optional[float] = Field(None, ge=0, le=1, description=&quot;ML confidence threshold&quot;)
+use_ml_optimization: bool = Field(default=True, description=&quot;Enable ML-based optimization&quot;)
+⋮----
+@validator(&apos;max_fill_size&apos;)
+    def validate_fill_sizes(cls, v: Optional[Decimal], values: Dict[str, Any]) -&gt; Optional[Decimal]
+⋮----
+min_size = values[&apos;min_fill_size&apos;]
+⋮----
+@root_validator(skip_on_failure=True)
+    def validate_venue_constraints(cls, values)
+⋮----
+allowed = values.get(&apos;allowed_venues&apos;, [])
+excluded = values.get(&apos;excluded_venues&apos;, [])
+⋮----
+overlap = set(allowed) &amp; set(excluded)
+⋮----
+class AssetSpec(BaseModel)
+⋮----
+asset: Asset = Field(..., description=&quot;Asset to trade&quot;)
+amount: Optional[Decimal] = Field(None, ge=0, description=&quot;Specific amount to trade&quot;)
+percentage: Optional[Decimal] = Field(None, ge=0, le=1, description=&quot;Percentage of portfolio&quot;)
+target_weight: Optional[Decimal] = Field(None, ge=0, le=1, description=&quot;Target portfolio weight&quot;)
+⋮----
+@root_validator(skip_on_failure=True)
+    def validate_amount_spec(cls, values)
+⋮----
+amount = values.get(&apos;amount&apos;)
+percentage = values.get(&apos;percentage&apos;)
+target_weight = values.get(&apos;target_weight&apos;)
+specified = sum(x is not None for x in [amount, percentage, target_weight])
+⋮----
+class MLFeatures(BaseModel)
+⋮----
+volatility: Optional[float] = Field(None, description=&quot;Market volatility&quot;)
+volume_ratio: Optional[float] = Field(None, description=&quot;Volume ratio vs historical average&quot;)
+spread: Optional[float] = Field(None, description=&quot;Bid-ask spread&quot;)
+market_impact: Optional[float] = Field(None, description=&quot;Estimated market impact&quot;)
+time_of_day: Optional[float] = Field(None, ge=0, le=24, description=&quot;Hour of day&quot;)
+day_of_week: Optional[int] = Field(None, ge=0, le=6, description=&quot;Day of week (0=Monday)&quot;)
+is_market_hours: Optional[bool] = Field(None, description=&quot;During traditional market hours&quot;)
+portfolio_concentration: Optional[float] = Field(None, description=&quot;Portfolio concentration risk&quot;)
+position_size_ratio: Optional[float] = Field(None, description=&quot;Position size vs portfolio&quot;)
+gas_price_percentile: Optional[float] = Field(None, ge=0, le=100, description=&quot;Gas price percentile&quot;)
+mempool_congestion: Optional[float] = Field(None, description=&quot;Mempool congestion level&quot;)
+custom_features: Dict[str, float] = Field(default_factory=dict, description=&quot;Custom ML features&quot;)
+class Intent(BaseModel)
+⋮----
+id: UUID = Field(default_factory=uuid4, description=&quot;Unique intent ID&quot;)
+strategy_id: UUID = Field(..., description=&quot;Strategy that generated this intent&quot;)
+parent_intent_id: Optional[UUID] = Field(None, description=&quot;Parent intent if this is a sub-intent&quot;)
+timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Intent creation timestamp&quot;)
+expires_at: Optional[datetime] = Field(None, description=&quot;Intent expiration time&quot;)
+type: IntentType = Field(..., description=&quot;Intent type&quot;)
+assets: List[AssetSpec] = Field(..., min_items=1, description=&quot;Assets to trade&quot;)
+constraints: IntentConstraints = Field(..., description=&quot;Execution constraints&quot;)
+priority: int = Field(default=5, ge=1, le=10, description=&quot;Intent priority (1=lowest, 10=highest)&quot;)
+metadata: Dict[str, Any] = Field(default_factory=dict, description=&quot;Additional metadata&quot;)
+tags: List[str] = Field(default_factory=list, description=&quot;Intent tags for categorization&quot;)
+status: IntentStatus = Field(default=IntentStatus.PENDING, description=&quot;Current status&quot;)
+status_reason: Optional[str] = Field(None, description=&quot;Reason for current status&quot;)
+ml_features: Optional[MLFeatures] = Field(None, description=&quot;ML features for optimization&quot;)
+ml_score: Optional[float] = Field(None, ge=0, le=1, description=&quot;ML-generated intent score&quot;)
+ml_predictions: Dict[str, float] = Field(default_factory=dict, description=&quot;ML model predictions&quot;)
+submitted_orders: List[UUID] = Field(default_factory=list, description=&quot;Submitted order IDs&quot;)
+filled_amount: Optional[Decimal] = Field(default=Decimal(&apos;0&apos;), ge=0, description=&quot;Amount filled so far&quot;)
+average_price: Optional[Decimal] = Field(None, description=&quot;Average execution price&quot;)
+total_gas_used: Optional[Decimal] = Field(default=Decimal(&apos;0&apos;), ge=0, description=&quot;Total gas used&quot;)
+⋮----
+@validator(&apos;expires_at&apos;)
+    def validate_expiration(cls, v: Optional[datetime], values: Dict[str, Any]) -&gt; Optional[datetime]
+⋮----
+timestamp = values.get(&apos;timestamp&apos;, datetime.utcnow())
+⋮----
+@validator(&apos;assets&apos;)
+    def validate_assets_not_empty(cls, v: List[AssetSpec]) -&gt; List[AssetSpec]
+⋮----
+@property
+    def is_expired(self) -&gt; bool
+⋮----
+@property
+    def time_remaining(self) -&gt; Optional[timedelta]
+⋮----
+remaining = self.expires_at - datetime.utcnow()
+⋮----
+@property
+    def is_multi_asset(self) -&gt; bool
+⋮----
+@property
+    def primary_asset(self) -&gt; Asset
+def get_asset_amount(self, asset: Asset) -&gt; Optional[AssetSpec]
+def update_status(self, new_status: IntentStatus, reason: Optional[str] = None) -&gt; None
+def add_ml_prediction(self, model_name: str, prediction: float) -&gt; None
+def calculate_fill_percentage(self) -&gt; Decimal
+⋮----
+primary_spec = self.assets[0]
+⋮----
+class IntentReceipt(BaseModel)
+⋮----
+intent_id: UUID = Field(..., description=&quot;Intent ID&quot;)
+received: datetime = Field(default_factory=datetime.utcnow, description=&quot;Receipt timestamp&quot;)
+status: IntentStatus = Field(default=IntentStatus.PENDING, description=&quot;Initial status&quot;)
+estimated_execution_time: Optional[timedelta] = Field(None, description=&quot;Estimated execution time&quot;)
+warnings: Optional[List[str]] = Field(None, description=&quot;Validation warnings&quot;)
+queue_position: Optional[int] = Field(None, description=&quot;Position in execution queue&quot;)
+class IntentUpdate(BaseModel)
+⋮----
+timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Update timestamp&quot;)
+old_status: IntentStatus = Field(..., description=&quot;Previous status&quot;)
+new_status: IntentStatus = Field(..., description=&quot;New status&quot;)
+reason: Optional[str] = Field(None, description=&quot;Reason for status change&quot;)
+filled_amount: Optional[Decimal] = Field(None, description=&quot;Amount filled&quot;)
+execution_details: Dict[str, Any] = Field(default_factory=dict, description=&quot;Execution details&quot;)
+⋮----
+assets = [</file><file path="Platform/types/rust_bridge.py">class OptimizeRouteParams(BaseModel)
+⋮----
+token_in: str = Field(..., description=&quot;Input token address or symbol&quot;)
+token_out: str = Field(..., description=&quot;Output token address or symbol&quot;)
+amount_in: int = Field(..., ge=0, description=&quot;Input amount as integer (raw units)&quot;)
+class OptimizeRouteResult(BaseModel)
+⋮----
+path: List[str] = Field(..., description=&quot;Token path as addresses&quot;)
+output_amount: int = Field(..., ge=0, description=&quot;Estimated output amount (raw units)&quot;)
+class AggregateOrderBookEntry(BaseModel)
+⋮----
+side: Literal[&quot;bid&quot;, &quot;ask&quot;]
+price: int = Field(..., ge=0)
+size: int = Field(..., ge=0)
+class AggregateOrderBooksOutput(BaseModel)
+⋮----
+bids: List[Tuple[int, int]]
+asks: List[Tuple[int, int]]
+class DecodedTransaction(BaseModel)
+⋮----
+from_: Optional[str] = Field(None, alias=&quot;from&quot;)
+to: Optional[str] = None
+nonce: Optional[int] = None
+gas: Optional[int] = None
+gas_price: Optional[int] = Field(None, alias=&quot;gas_price&quot;)
+value: Optional[int] = None
+input: Optional[str] = None
+hash: Optional[str] = None
+⋮----
+@validator(&quot;input&quot;)
+    def ensure_hex_prefix(cls, v: Optional[str]) -&gt; Optional[str]</file><file path="Platform/__init__.py">_builtin_platform = importlib.import_module(&quot;platform&quot;)</file><file path="Platform/app.py">logger = structlog.get_logger()
+⋮----
+@asynccontextmanager
+async def lifespan(app: FastAPI) -&gt; AsyncGenerator[None, None]
+def create_app() -&gt; FastAPI
+⋮----
+app = FastAPI(
+⋮----
+async def request_id_dispatch(request, call_next)
+⋮----
+req_id = request.headers.get(&quot;X-Request-ID&quot;) or str(uuid.uuid4())
+⋮----
+response = await call_next(request)
+⋮----
+@app.get(&quot;/health&quot;)
+    async def health_check()</file><file path="Platform/config.py">class DatabaseConfig(PydanticBaseSettings)
+⋮----
+host: str = Field(default=&quot;localhost&quot;, description=&quot;Database host&quot;)
+port: int = Field(default=5432, description=&quot;Database port&quot;)
+database: str = Field(default=&quot;platform&quot;, description=&quot;Database name&quot;)
+username: str = Field(default=&quot;platform&quot;, description=&quot;Database username&quot;)
+password: str = Field(default=&quot;platform&quot;, description=&quot;Database password&quot;)
+pool_size: int = Field(default=10, description=&quot;Connection pool size&quot;)
+max_overflow: int = Field(default=20, description=&quot;Max pool overflow&quot;)
+max_size: int = Field(default=20, description=&quot;Maximum pool size (use instead of max_overflow)&quot;)
+⋮----
+@property
+    def url(self) -&gt; str
+class RedisConfig(PydanticBaseSettings)
+⋮----
+host: str = Field(default=&quot;localhost&quot;, description=&quot;Redis host&quot;)
+port: int = Field(default=6379, description=&quot;Redis port&quot;)
+db: int = Field(default=0, description=&quot;Redis database number&quot;)
+password: Optional[str] = Field(default=None, description=&quot;Redis password&quot;)
+max_connections: int = Field(default=20, description=&quot;Max connections&quot;)
+⋮----
+auth = f&quot;:{self.password}@&quot; if self.password else &quot;&quot;
+⋮----
+class NATSConfig(PydanticBaseSettings)
+⋮----
+servers: List[str] = Field(default=[&quot;nats://localhost:4222&quot;], description=&quot;NATS servers&quot;)
+max_reconnect_attempts: int = Field(default=60, description=&quot;Max reconnection attempts&quot;)
+reconnect_time_wait: float = Field(default=2.0, description=&quot;Reconnect wait time&quot;)
+class RayConfig(PydanticBaseSettings)
+⋮----
+address: Optional[str] = Field(default=None, description=&quot;Ray cluster address&quot;)
+num_cpus: Optional[int] = Field(default=None, description=&quot;Number of CPUs to use&quot;)
+num_gpus: Optional[int] = Field(default=None, description=&quot;Number of GPUs to use&quot;)
+object_store_memory: Optional[int] = Field(default=None, description=&quot;Object store memory&quot;)
+class MLConfig(PydanticBaseSettings)
+⋮----
+model_cache_dir: str = Field(default=&quot;./models&quot;, description=&quot;ML model cache directory&quot;)
+gpu_memory_fraction: float = Field(default=0.8, description=&quot;GPU memory fraction to use&quot;)
+enable_onnx_optimization: bool = Field(default=True, description=&quot;Enable ONNX runtime optimizations&quot;)
+max_model_cache_size: int = Field(default=10, description=&quot;Maximum models to cache&quot;)
+class PlatformConfig(PydanticBaseSettings)
+⋮----
+environment: str = Field(default=&quot;development&quot;, description=&quot;Environment (development/staging/production)&quot;)
+debug: bool = Field(default=True, description=&quot;Debug mode&quot;)
+api_host: str = Field(default=&quot;0.0.0.0&quot;, description=&quot;API host&quot;)
+api_port: int = Field(default=8000, description=&quot;API port&quot;)
+database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+redis: RedisConfig = Field(default_factory=RedisConfig)
+nats: NATSConfig = Field(default_factory=NATSConfig)
+ray: RayConfig = Field(default_factory=RayConfig)
+ml: MLConfig = Field(default_factory=MLConfig)
+rpc_urls: Dict[int, str] = Field(default_factory=dict)
+max_intent_queue_size: int = Field(default=10000, description=&quot;Maximum intent queue size&quot;)
+intent_processing_timeout: float = Field(default=30.0, description=&quot;Intent processing timeout&quot;)
+event_buffer_size: int = Field(default=1000, description=&quot;Event buffer size&quot;)
+class Config
+⋮----
+env_prefix = &quot;PLATFORM_&quot;
+env_nested_delimiter = &quot;__&quot;
+case_sensitive = False
+config = PlatformConfig()</file><file path="Platform/dependencies.py">logger = structlog.get_logger()
+class CoreComponents
+⋮----
+def __init__(self)
+async def initialize(self) -&gt; None
+async def shutdown(self) -&gt; None
+components = CoreComponents()</file><file path="Platform/rust_bindings.py">logger = structlog.get_logger()
+_platform_rust = None
+⋮----
+def _fallback_decode_transaction(tx: Any) -&gt; Dict[str, Any]
+⋮----
+result = {
+⋮----
+def _fallback_optimize_route(params: Dict[str, Any]) -&gt; Dict[str, Any]
+⋮----
+parsed = OptimizeRouteParams(**params)
+⋮----
+def _fallback_simulate_transaction(step: Dict[str, Any]) -&gt; Dict[str, Any]
+def _fallback_aggregate_order_books(books: List[Any]) -&gt; Any
+⋮----
+bids: List[Any] = []
+asks: List[Any] = []
+⋮----
+side = e.get(&quot;side&quot;)
+price = e.get(&quot;price&quot;)
+size = e.get(&quot;size&quot;)
+⋮----
+def decode_transaction(tx: Any) -&gt; Dict[str, Any]
+⋮----
+decoded = _platform_rust.decode_transaction(tx)
+⋮----
+def optimize_route(params: Dict[str, Any]) -&gt; Dict[str, Any]
+⋮----
+engine = _platform_rust.ExecutionEngine()
+result = engine.optimize_route(parsed.dict())
+⋮----
+def simulate_transaction(step: Dict[str, Any]) -&gt; Dict[str, Any]
+def aggregate_order_books(books: List[Any]) -&gt; Any
+⋮----
+entries = [AggregateOrderBookEntry.parse_obj(b).dict() for b in books]
+⋮----
+result = _platform_rust.aggregate_order_books(entries)</file><file path="Platform/services.py">logger = structlog.get_logger()
+class ServiceConnector
+⋮----
+def __init__(self)
+async def connect_all(self) -&gt; None
+⋮----
+max_size = getattr(config.database, &quot;max_size&quot;, None) or config.database.max_overflow
+⋮----
+async def disconnect_all(self) -&gt; None
+services = ServiceConnector()</file><file path="src/chain_monitor.rs">use pyo3::types::PyDict;
+use pyo3::exceptions::PyValueError;
+use ethers::types::Transaction;
+use rlp;
+⋮----
+fn decode_transaction(py: Python, tx_hex: &amp;str) -&gt; PyResult&lt;PyObject&gt; {
+let bytes = hex::decode(tx_hex.trim_start_matches(&quot;0x&quot;))
+.map_err(|e| PyValueError::new_err(format!(&quot;invalid hex: {e}&quot;)))?;
+⋮----
+.map_err(|e| PyValueError::new_err(format!(&quot;rlp decode failed: {e}&quot;)))?;
+⋮----
+out.set_item(&quot;from&quot;, format!(&quot;{:#x}&quot;, tx.from))?;
+⋮----
+out.set_item(&quot;to&quot;, format!(&quot;{:#x}&quot;, to))?;
+⋮----
+out.set_item(&quot;to&quot;, Option::&lt;String&gt;::None)?;
+⋮----
+out.set_item(&quot;nonce&quot;, tx.nonce.as_u64())?;
+out.set_item(&quot;gas&quot;, tx.gas.to_string())?;
+if let Some(p) = tx.gas_price { out.set_item(&quot;gas_price&quot;, p.to_string())?; }
+else { out.set_item(&quot;gas_price&quot;, Option::&lt;String&gt;::None)?; }
+out.set_item(&quot;value&quot;, tx.value.to_string())?;
+out.set_item(&quot;input&quot;, format!(&quot;0x{}&quot;, hex::encode(tx.input)))?;
+out.set_item(&quot;hash&quot;, format!(&quot;{:#x}&quot;, tx.hash))?;
+Ok(out.into_any().unbind().into())
+⋮----
+pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+m.add_function(wrap_pyfunction!(decode_transaction, m)?)?;
+Ok(())</file><file path="src/execution.rs">use std::collections::HashMap;
+⋮----
+struct Token { address: String, symbol: String }
+⋮----
+struct Pool {
+⋮----
+struct Route { path: Vec&lt;String&gt;, output_amount: u128 }
+⋮----
+pub struct ExecutionEngine {
+⋮----
+impl ExecutionEngine {
+⋮----
+fn new() -&gt; Self {
+⋮----
+engine_id: uuid::Uuid::new_v4().to_string(),
+⋮----
+fn optimize_route(&amp;self, py: Python, params: &amp;Bound&lt;&apos;_, PyDict&gt;) -&gt; PyResult&lt;PyObject&gt; {
+// Parse inputs
+let token_in: String = params.get_item(&quot;token_in&quot;)?
+.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing &apos;token_in&apos;&quot;))?
+.extract()?;
+let token_out: String = params.get_item(&quot;token_out&quot;)?
+.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing &apos;token_out&apos;&quot;))?
+⋮----
+let amount_in: u128 = params.get_item(&quot;amount_in&quot;)?
+.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing &apos;amount_in&apos;&quot;))?
+⋮----
+let guard = self.pools.read().map_err(|_| {
+⋮----
+guard.values().cloned().collect()
+⋮----
+let route = py.allow_threads(|| {
+use std::cmp::Ordering;
+⋮----
+struct Node { amt: u128, token: String }
+impl Ord for Node {
+fn cmp(&amp;self, other: &amp;Self) -&gt; Ordering { self.amt.cmp(&amp;other.amt) }
+⋮----
+impl PartialOrd for Node {
+fn partial_cmp(&amp;self, other: &amp;Self) -&gt; Option&lt;Ordering&gt; { Some(self.cmp(other)) }
+⋮----
+dist.insert(token_in.clone(), amount_in);
+pq.push(Node { amt: amount_in, token: token_in.clone() });
+while let Some(Node { amt, token }) = pq.pop() {
+if amt &lt; *dist.get(&amp;token).unwrap_or(&amp;0) { continue; }
+⋮----
+nexts.push((&amp;pool.token1, out));
+⋮----
+nexts.push((&amp;pool.token0, out));
+⋮----
+if out_amt &gt; *dist.get(&amp;nt.address).unwrap_or(&amp;0) {
+dist.insert(nt.address.clone(), out_amt);
+prev.insert(nt.address.clone(), token.clone());
+pq.push(Node { amt: out_amt, token: nt.address.clone() });
+⋮----
+if !dist.contains_key(&amp;token_out) {
+⋮----
+let mut cur = token_out.clone();
+while let Some(p) = prev.get(&amp;cur) {
+path.push(cur.clone());
+cur = p.clone();
+⋮----
+path.push(token_in.clone());
+path.reverse();
+Some(Route { path, output_amount: *dist.get(&amp;token_out).unwrap_or(&amp;0) })
+⋮----
+out.set_item(&quot;path&quot;, &amp;path_list)?;
+out.set_item(&quot;output_amount&quot;, r.output_amount)?;
+Ok(out.into_any().unbind().into())
+⋮----
+None =&gt; Ok(py.None()),
+⋮----
+fn update_pools(&amp;self, _py: Python, pools_data: &amp;Bound&lt;&apos;_, PyList&gt;) -&gt; PyResult&lt;()&gt; {
+let mut map = self.pools.write().map_err(|_| {
+⋮----
+map.clear();
+for pool_any in pools_data.iter() {
+let pool_dict: &amp;Bound&lt;PyDict&gt; = pool_any.downcast()?;
+let token0_item = pool_dict.get_item(&quot;token0&quot;)?
+.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token0&quot;))?;
+let token0: &amp;Bound&lt;PyDict&gt; = token0_item.downcast()?;
+let token1_item = pool_dict.get_item(&quot;token1&quot;)?
+.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token1&quot;))?;
+let token1: &amp;Bound&lt;PyDict&gt; = token1_item.downcast()?;
+⋮----
+address: pool_dict.get_item(&quot;address&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing address&quot;))?.extract()?,
+⋮----
+address: token0.get_item(&quot;address&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token0.address&quot;))?.extract()?,
+symbol:  token0.get_item(&quot;symbol&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token0.symbol&quot;))?.extract()?,
+⋮----
+address: token1.get_item(&quot;address&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token1.address&quot;))?.extract()?,
+symbol:  token1.get_item(&quot;symbol&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token1.symbol&quot;))?.extract()?,
+⋮----
+fee: pool_dict.get_item(&quot;fee&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing fee&quot;))?.extract()?,
+liquidity: pool_dict.get_item(&quot;liquidity&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing liquidity&quot;))?.extract()?,
+⋮----
+map.insert(pool.address.clone(), pool);
+⋮----
+Ok(())
+⋮----
+// Pure Rust helper
+⋮----
+fn calculate_amount_out(pool: &amp;Pool, amount_in: u128) -&gt; u128 {
+// Replace with correct AMM formula later
+amount_in.saturating_sub((amount_in as u128 * pool.fee as u128) / 1_000_000u128)
+⋮----
+pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {</file><file path="src/lib.rs">mod execution;
+mod chain_monitor;
+mod market_data;
+mod transaction;
+⋮----
+.enable_all()
+.thread_name(&quot;platform-rt&quot;)
+.max_blocking_threads(1024)
+.build()
+.expect(&quot;tokio runtime&quot;)
+⋮----
+pub fn initialize_rust_runtime() -&gt; PyResult&lt;()&gt; {
+let _ = TRACING_INIT.get_or_init(|| {
+⋮----
+Ok(())
+⋮----
+pub fn runtime_handle() -&gt; &amp;&apos;static tokio::runtime::Handle {
+GLOBAL_RUNTIME.handle()
+⋮----
+fn platform_rust(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+m.add_function(wrap_pyfunction!(initialize_rust_runtime, m)?)?;</file><file path="src/market_data.rs">pub fn aggregate_order_books(py: Python, books: &amp;Bound&lt;&apos;_, PyList&gt;) -&gt; PyResult&lt;PyObject&gt; {
+⋮----
+for any in books.iter() {
+let d: &amp;Bound&lt;PyDict&gt; = any.downcast()?;
+let side: String = d.get_item(&quot;side&quot;)?
+.ok_or_else(|| PyKeyError::new_err(&quot;missing &apos;side&apos;&quot;))?
+.extract()?;
+let price: i64 = d.get_item(&quot;price&quot;)?
+.ok_or_else(|| PyKeyError::new_err(&quot;missing &apos;price&apos;&quot;))?
+⋮----
+let size: i64 = d.get_item(&quot;size&quot;)?
+.ok_or_else(|| PyKeyError::new_err(&quot;missing &apos;size&apos;&quot;))?
+⋮----
+match side.as_str() {
+&quot;bid&quot; =&gt; bids.push((price, size)),
+&quot;ask&quot; =&gt; asks.push((price, size)),
+_ =&gt; return Err(PyTypeError::new_err(&quot;side must be &apos;bid&apos; or &apos;ask&apos;&quot;)),
+⋮----
+use std::collections::BTreeMap;
+⋮----
+for (p, s) in bids { *bid_map.entry(p).or_insert(0) += s; }
+for (p, s) in asks { *ask_map.entry(p).or_insert(0) += s; }
+⋮----
+let bids_vec: Vec&lt;(i64, i64)&gt; = bid_map.into_iter().collect();
+let asks_vec: Vec&lt;(i64, i64)&gt; = ask_map.into_iter().collect();
+⋮----
+out.set_item(&quot;bids&quot;, &amp;bids_list)?;
+out.set_item(&quot;asks&quot;, &amp;asks_list)?;
+Ok(out.into_any().unbind().into())
+⋮----
+pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+m.add_function(wrap_pyfunction!(aggregate_order_books, m)?)?;
+Ok(())</file><file path="src/transaction.rs">use pyo3::types::PyList;
+⋮----
+pub struct TransactionBatcher { max_batch_size: usize }
+⋮----
+impl TransactionBatcher {
+⋮----
+fn new(max_batch_size: Option&lt;usize&gt;) -&gt; Self {
+Self { max_batch_size: max_batch_size.unwrap_or(100) }
+⋮----
+fn batch_transactions(&amp;self, py: Python, transactions: Vec&lt;String&gt;) -&gt; PyResult&lt;PyObject&gt; {
+⋮----
+.chunks(self.max_batch_size)
+.map(|c| c.to_vec())
+.collect();
+⋮----
+Ok(py_list.into_any().unbind().into())
+⋮----
+pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+⋮----
+Ok(())</file></files></repomix>

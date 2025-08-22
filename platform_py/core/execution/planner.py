@@ -1,5 +1,9 @@
 """
-Async execution planner with ML-based cost estimation and simulation.
+Async execution planner with event-driven planning for V1.
+
+Listens for `intent.accepted` and publishes a minimal `plan.created` envelope
+with a single Uniswap V3 swap step, using cached pool snapshots to avoid RPC
+in the hot path.
 """
 
 import asyncio
@@ -8,6 +12,8 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 
 from ...types import Intent, AssetAmount
+from ...types.envelope import EventEnvelope
+from ...streaming import EventStream
 from ...rust_bindings import optimize_route, simulate_transaction # Placeholder for PyO3 module
 
 from .venue_manager import VenueManager
@@ -29,10 +35,47 @@ class ExecutionPlan:
 class ExecutionPlanner:
     """Creates an execution plan for a given intent."""
     
-    def __init__(self, venue_manager: VenueManager, ml_cost_model: Optional[Any] = None):
+    def __init__(self, venue_manager: VenueManager, event_stream: Optional[EventStream] = None, ml_cost_model: Optional[Any] = None):
         self.venue_manager = venue_manager
+        self.event_stream = event_stream
         self.ml_cost_model = ml_cost_model
         logger.info("ExecutionPlanner initialized", ml_cost_model_enabled=bool(ml_cost_model))
+
+    async def start(self) -> None:
+        """Subscribe to intent.accepted and begin planning."""
+        if not self.event_stream:
+            raise RuntimeError("ExecutionPlanner requires EventStream to start")
+
+        await self.venue_manager.initialize()
+
+        async def on_intent_accepted(evt: Dict[str, Any]):
+            try:
+                # evt is a dict from EventEnvelope, not pydantic model
+                payload = evt.get("payload", {})
+                intent_id = payload.get("intentId")
+                if not intent_id:
+                    return
+                # Build a minimal single-step plan for Uniswap V3
+                plan_id = self._ulid()
+                step = await self._build_single_step(payload)
+                from ...types.envelope import envelope
+                env = envelope(
+                    topic="plan.created",
+                    payload={
+                        "planId": plan_id,
+                        "intentId": intent_id,
+                        "steps": [step],
+                    },
+                    correlation_id=evt.get("correlationId", f"intent:{intent_id}"),
+                    causation_id=evt.get("eventId"),
+                )
+                await self.event_stream.publish_envelope(env)
+            except Exception as e:
+                logger.error("Planner on_intent_accepted error", error=str(e), evt=evt)
+
+        # Subscribe to exact subject
+        await self.event_stream.subscribe("intent.accepted", on_intent_accepted)
+        logger.info("ExecutionPlanner subscribed to intent.accepted")
 
     async def create_plan(self, intent: Intent) -> ExecutionPlan:
         """Generate an execution plan for an intent."""
@@ -147,3 +190,38 @@ class ExecutionPlanner:
                     step['optimized_route'] = route
                 except Exception as e:
                     logger.error("Route optimization failed", error=str(e), step=step)
+
+    async def _build_single_step(self, accepted_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a single Uniswap V3 swap step using cached pool snapshot.
+
+        For V1, we assume two assets in the intent payload: base (target) and quote with amount.
+        """
+        intent = accepted_payload.get("intent") or {}
+        assets = intent.get("assets", [])
+        if len(assets) < 2:
+            # Fallback: create a no-op step
+            return {"type": "noop"}
+
+        base = assets[0].get("asset") or assets[0]
+        quote = assets[1].get("asset") or assets[1]
+        amount_in = assets[1].get("amount") or 0
+        constraints = intent.get("constraints", {})
+        max_slippage = float(constraints.get("max_slippage", 0.01))
+
+        # Use VenueManager cached data (mock) to compute a naive min_out
+        # Here we assume price is quote per base; adjust accordingly
+        # For simplicity, set min_out = amount_in * (1 - max_slippage) as placeholder
+        min_out = float(amount_in) * (1 - max_slippage)
+
+        return {
+            "venue": "uniswap_v3",
+            "chain": base.get("chain_id") or base.get("chain"),
+            "base": base,
+            "quote": quote,
+            "amount_in": amount_in,
+            "min_out": str(min_out),
+        }
+
+    def _ulid(self) -> str:
+        from ...types.envelope import ulid
+        return ulid()

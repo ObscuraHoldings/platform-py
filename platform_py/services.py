@@ -72,11 +72,15 @@ class ServiceConnector:
         # Connect to Ray
         try:
             if not ray.is_initialized():
-                ray.init(address=config.ray.address or 'auto')
-            logger.info("Ray connected", address=config.ray.address or 'auto')
+                if config.ray.address:
+                    ray.init(address=config.ray.address)
+                else:
+                    # Start a local Ray runtime for dev; avoid 'auto' to prevent failures
+                    ray.init()
+            logger.info("Ray connected", address=config.ray.address or 'local')
         except Exception as e:
-            logger.error("Failed to connect to Ray", error=str(e), exc_info=True)
-            raise
+            # Non-fatal for API bring-up; warn and proceed without Ray
+            logger.warning("Ray unavailable; proceeding without distributed features", error=str(e))
 
     async def disconnect_all(self) -> None:
         """Disconnect from all external services."""

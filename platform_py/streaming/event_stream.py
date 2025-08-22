@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 
 from ..config import config
 from ..types import Event
+from ..types.envelope import EventEnvelope
 
 logger = structlog.get_logger()
 
@@ -24,7 +25,15 @@ logger = structlog.get_logger()
 class StreamConfig:
     """Event stream configuration."""
     stream_name: str = "platform_events"
-    subjects: List[str] = field(default_factory=lambda: ["intent.*", "strategy.*", "market.*", "execution.*", "system.*"])
+    subjects: List[str] = field(default_factory=lambda: [
+        "intent.*",
+        "risk.*",
+        "plan.*",
+        "exec.*",
+        "strategy.*",
+        "market.*",
+        "system.*",
+    ])
     durable_name: str = "platform_worker"
     retention_policy: str = "workqueue" # Exactly-once semantics
     max_age_seconds: int = 86400  # 24 hours
@@ -171,6 +180,30 @@ class EventStream:
             ack_wait=30 # 30 seconds to process
         )
         logger.info("Subscribed to subject", subject=subject, durable_name=durable)
+
+    async def publish_envelope(self, env: EventEnvelope, headers: Optional[Dict[str, str]] = None) -> None:
+        """Publish a typed EventEnvelope.
+
+        Uses NATS msg_id for server-side deduplication and mirrors the envelope's
+        topic to the NATS subject. Also buffers to Redis for quick UI replay.
+        """
+        if not self.jetstream:
+            raise RuntimeError("EventStream not initialized")
+
+        data = env.model_dump()
+        msg_id = env.eventId
+        try:
+            ack = await self.jetstream.publish(
+                env.topic,
+                json.dumps(data).encode("utf-8"),
+                headers=headers,
+                msg_id=msg_id,
+                timeout=5.0,
+            )
+            logger.debug("Envelope published", subject=env.topic, stream=ack.stream, seq=ack.seq)
+            await self._buffer_in_redis(env.topic, data)
+        except NatsTimeoutError:
+            logger.error("Publish timeout", subject=env.topic)
 
     async def _buffer_in_redis(self, subject: str, event: Dict[str, Any]) -> None:
         """Store event in a Redis stream for buffering and quick replay."""
