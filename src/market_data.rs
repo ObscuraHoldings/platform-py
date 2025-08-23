@@ -1,7 +1,7 @@
 // market_data.rs
+use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use pyo3::exceptions::{PyTypeError, PyKeyError};
 
 #[pyfunction]
 pub fn aggregate_order_books(py: Python, books: &Bound<'_, PyList>) -> PyResult<PyObject> {
@@ -10,13 +10,16 @@ pub fn aggregate_order_books(py: Python, books: &Bound<'_, PyList>) -> PyResult<
 
     for any in books.iter() {
         let d: &Bound<PyDict> = any.downcast()?;
-        let side: String = d.get_item("side")?
+        let side: String = d
+            .get_item("side")?
             .ok_or_else(|| PyKeyError::new_err("missing 'side'"))?
             .extract()?;
-        let price: i64 = d.get_item("price")?
+        let price: i64 = d
+            .get_item("price")?
             .ok_or_else(|| PyKeyError::new_err("missing 'price'"))?
             .extract()?;
-        let size: i64 = d.get_item("size")?
+        let size: i64 = d
+            .get_item("size")?
             .ok_or_else(|| PyKeyError::new_err("missing 'size'"))?
             .extract()?;
         match side.as_str() {
@@ -29,8 +32,12 @@ pub fn aggregate_order_books(py: Python, books: &Bound<'_, PyList>) -> PyResult<
     use std::collections::BTreeMap;
     let mut bid_map = BTreeMap::new();
     let mut ask_map = BTreeMap::new();
-    for (p, s) in bids { *bid_map.entry(p).or_insert(0) += s; }
-    for (p, s) in asks { *ask_map.entry(p).or_insert(0) += s; }
+    for (p, s) in bids {
+        *bid_map.entry(p).or_insert(0) += s;
+    }
+    for (p, s) in asks {
+        *ask_map.entry(p).or_insert(0) += s;
+    }
 
     let out = PyDict::new(py);
     let bids_vec: Vec<(i64, i64)> = bid_map.into_iter().collect();

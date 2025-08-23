@@ -3,14 +3,18 @@ use pyo3::prelude::*;
 use pyo3::types::PyList;
 
 #[pyclass]
-pub struct TransactionBatcher { max_batch_size: usize }
+pub struct TransactionBatcher {
+    max_batch_size: usize,
+}
 
 #[pymethods]
 impl TransactionBatcher {
     #[new]
     #[pyo3(signature = (max_batch_size=None))]
     fn new(max_batch_size: Option<usize>) -> Self {
-        Self { max_batch_size: max_batch_size.unwrap_or(100) }
+        Self {
+            max_batch_size: max_batch_size.unwrap_or(100),
+        }
     }
 
     fn batch_transactions(&self, py: Python, transactions: Vec<String>) -> PyResult<PyObject> {

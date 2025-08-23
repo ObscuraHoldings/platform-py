@@ -1,10 +1,10 @@
 // lib.rs
 use once_cell::sync::{Lazy, OnceCell};
-use tokio::runtime::{Builder, Runtime};
 use pyo3::prelude::*;
+use tokio::runtime::{Builder, Runtime};
 
-mod execution;
 mod chain_monitor;
+mod execution;
 mod market_data;
 mod transaction;
 

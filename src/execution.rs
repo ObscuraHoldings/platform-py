@@ -1,11 +1,14 @@
 // execution.rs
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 #[derive(Clone, Debug)]
-struct Token { address: String, symbol: String }
+struct Token {
+    address: String,
+    symbol: String,
+}
 
 #[derive(Clone, Debug)]
 struct Pool {
@@ -16,7 +19,10 @@ struct Pool {
     liquidity: u128,
 }
 
-struct Route { path: Vec<String>, output_amount: u128 }
+struct Route {
+    path: Vec<String>,
+    output_amount: u128,
+}
 
 #[pyclass]
 pub struct ExecutionEngine {
@@ -38,21 +44,25 @@ impl ExecutionEngine {
     #[pyo3(text_signature = "($self, params)")]
     fn optimize_route(&self, py: Python, params: &Bound<'_, PyDict>) -> PyResult<PyObject> {
         // Parse inputs
-        let token_in: String = params.get_item("token_in")?
+        let token_in: String = params
+            .get_item("token_in")?
             .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing 'token_in'"))?
             .extract()?;
-        let token_out: String = params.get_item("token_out")?
+        let token_out: String = params
+            .get_item("token_out")?
             .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing 'token_out'"))?
             .extract()?;
-        let amount_in: u128 = params.get_item("amount_in")?
+        let amount_in: u128 = params
+            .get_item("amount_in")?
             .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing 'amount_in'"))?
             .extract()?;
 
         // Compute without the GIL
         let pools_snapshot: Vec<Pool> = {
-            let guard = self.pools.read().map_err(|_| {
-                pyo3::exceptions::PyRuntimeError::new_err("pools lock poisoned")
-            })?;
+            let guard = self
+                .pools
+                .read()
+                .map_err(|_| pyo3::exceptions::PyRuntimeError::new_err("pools lock poisoned"))?;
             guard.values().cloned().collect()
         };
 
@@ -62,12 +72,19 @@ impl ExecutionEngine {
             use std::collections::{BinaryHeap, HashMap};
 
             #[derive(Eq, PartialEq)]
-            struct Node { amt: u128, token: String }
+            struct Node {
+                amt: u128,
+                token: String,
+            }
             impl Ord for Node {
-                fn cmp(&self, other: &Self) -> Ordering { self.amt.cmp(&other.amt) }
+                fn cmp(&self, other: &Self) -> Ordering {
+                    self.amt.cmp(&other.amt)
+                }
             }
             impl PartialOrd for Node {
-                fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+                fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                    Some(self.cmp(other))
+                }
             }
 
             let mut dist: HashMap<String, u128> = HashMap::new();
@@ -75,10 +92,15 @@ impl ExecutionEngine {
             let mut pq: BinaryHeap<Node> = BinaryHeap::new();
 
             dist.insert(token_in.clone(), amount_in);
-            pq.push(Node { amt: amount_in, token: token_in.clone() });
+            pq.push(Node {
+                amt: amount_in,
+                token: token_in.clone(),
+            });
 
             while let Some(Node { amt, token }) = pq.pop() {
-                if amt < *dist.get(&token).unwrap_or(&0) { continue; }
+                if amt < *dist.get(&token).unwrap_or(&0) {
+                    continue;
+                }
 
                 for pool in &pools_snapshot {
                     // Determine direction by matching address or symbol if address missing
@@ -95,7 +117,10 @@ impl ExecutionEngine {
                         if out_amt > *dist.get(&nt.address).unwrap_or(&0) {
                             dist.insert(nt.address.clone(), out_amt);
                             prev.insert(nt.address.clone(), token.clone());
-                            pq.push(Node { amt: out_amt, token: nt.address.clone() });
+                            pq.push(Node {
+                                amt: out_amt,
+                                token: nt.address.clone(),
+                            });
                         }
                     }
                 }
@@ -113,7 +138,10 @@ impl ExecutionEngine {
             }
             path.push(token_in.clone());
             path.reverse();
-            Some(Route { path, output_amount: *dist.get(&token_out).unwrap_or(&0) })
+            Some(Route {
+                path,
+                output_amount: *dist.get(&token_out).unwrap_or(&0),
+            })
         });
 
         match route {
@@ -130,30 +158,62 @@ impl ExecutionEngine {
 
     #[pyo3(text_signature = "($self, pools_data)")]
     fn update_pools(&self, _py: Python, pools_data: &Bound<'_, PyList>) -> PyResult<()> {
-        let mut map = self.pools.write().map_err(|_| {
-            pyo3::exceptions::PyRuntimeError::new_err("pools lock poisoned")
-        })?;
+        let mut map = self
+            .pools
+            .write()
+            .map_err(|_| pyo3::exceptions::PyRuntimeError::new_err("pools lock poisoned"))?;
         map.clear();
         for pool_any in pools_data.iter() {
             let pool_dict: &Bound<PyDict> = pool_any.downcast()?;
-            let token0_item = pool_dict.get_item("token0")?
+            let token0_item = pool_dict
+                .get_item("token0")?
                 .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token0"))?;
             let token0: &Bound<PyDict> = token0_item.downcast()?;
-            let token1_item = pool_dict.get_item("token1")?
+            let token1_item = pool_dict
+                .get_item("token1")?
                 .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token1"))?;
             let token1: &Bound<PyDict> = token1_item.downcast()?;
             let pool = Pool {
-                address: pool_dict.get_item("address")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing address"))?.extract()?,
+                address: pool_dict
+                    .get_item("address")?
+                    .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing address"))?
+                    .extract()?,
                 token0: Token {
-                    address: token0.get_item("address")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token0.address"))?.extract()?,
-                    symbol:  token0.get_item("symbol")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token0.symbol"))?.extract()?,
+                    address: token0
+                        .get_item("address")?
+                        .ok_or_else(|| {
+                            pyo3::exceptions::PyKeyError::new_err("missing token0.address")
+                        })?
+                        .extract()?,
+                    symbol: token0
+                        .get_item("symbol")?
+                        .ok_or_else(|| {
+                            pyo3::exceptions::PyKeyError::new_err("missing token0.symbol")
+                        })?
+                        .extract()?,
                 },
                 token1: Token {
-                    address: token1.get_item("address")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token1.address"))?.extract()?,
-                    symbol:  token1.get_item("symbol")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing token1.symbol"))?.extract()?,
+                    address: token1
+                        .get_item("address")?
+                        .ok_or_else(|| {
+                            pyo3::exceptions::PyKeyError::new_err("missing token1.address")
+                        })?
+                        .extract()?,
+                    symbol: token1
+                        .get_item("symbol")?
+                        .ok_or_else(|| {
+                            pyo3::exceptions::PyKeyError::new_err("missing token1.symbol")
+                        })?
+                        .extract()?,
                 },
-                fee: pool_dict.get_item("fee")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing fee"))?.extract()?,
-                liquidity: pool_dict.get_item("liquidity")?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing liquidity"))?.extract()?,
+                fee: pool_dict
+                    .get_item("fee")?
+                    .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing fee"))?
+                    .extract()?,
+                liquidity: pool_dict
+                    .get_item("liquidity")?
+                    .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("missing liquidity"))?
+                    .extract()?,
             };
             map.insert(pool.address.clone(), pool);
         }

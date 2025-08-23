@@ -3,15 +3,14 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 // Alloy replaces ethers for transaction decoding and signer recovery.
-use alloy_consensus::transaction::{EthereumTxEnvelope, Transaction, TxEip4844, SignerRecoverable};
+use alloy_consensus::transaction::{EthereumTxEnvelope, SignerRecoverable, Transaction, TxEip4844};
 use alloy_rlp::Decodable;
 
 #[pyfunction]
 fn decode_transaction(py: Python<'_>, tx_hex: &str) -> PyResult<PyObject> {
     // Strip optional 0x and decode hex
     let raw = tx_hex.trim_start_matches("0x");
-    let bytes = hex::decode(raw)
-        .map_err(|e| PyValueError::new_err(format!("invalid hex: {e}")))?;
+    let bytes = hex::decode(raw).map_err(|e| PyValueError::new_err(format!("invalid hex: {e}")))?;
     let mut slice: &[u8] = &bytes;
 
     // Decode as EIP-2718 envelope (supports legacy/1559/2930/7702/4844)
