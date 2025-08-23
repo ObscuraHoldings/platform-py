@@ -119,12 +119,12 @@ impl ExecutionEngine {
         match route {
             Some(r) => {
                 let out = PyDict::new(py);
-                let path_list = PyList::new(py, &r.path);
-                out.set_item("path", &path_list)?;
+                let path_list = PyList::new(py, &r.path)?;
+                out.set_item("path", path_list)?;
                 out.set_item("output_amount", r.output_amount)?;
-                Ok(out.into_py(py))
+                Ok(out.unbind().into_any())
             }
-            None => Ok(py.None().into_py(py)),
+            None => Ok(py.None()),
         }
     }
 

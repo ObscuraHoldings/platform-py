@@ -1,3 +1,5 @@
+-- LEGACY: Reference-only schema. Not used by the active migration flow.
+-- Active migrations live in `db/migrations/*.sql` and are applied via `scripts/migrate.py`.
 -- Defines the schema for the event store in TimescaleDB.
 
 CREATE TABLE IF NOT EXISTS events (

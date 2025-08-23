@@ -5,7 +5,7 @@ This module provides event types for TimescaleDB with bi-temporal tracking and a
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Union, Type, TypeVar
 from uuid import UUID, uuid4
 from abc import ABC, abstractmethod
@@ -62,7 +62,7 @@ class Event(BaseModel):
     
     # Bi-temporal tracking
     business_timestamp: datetime = Field(..., description="When the business event occurred")
-    system_timestamp: datetime = Field(default_factory=datetime.utcnow, description="When event was recorded")
+    system_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When event was recorded")
     
     # Event data
     payload: EventPayload = Field(..., description="Event payload data")
@@ -76,7 +76,7 @@ class Event(BaseModel):
     @field_validator('business_timestamp')
     def validate_business_timestamp(cls, v: datetime) -> datetime:
         """Validate business timestamp is not in the future."""
-        if v > datetime.utcnow():
+        if v > datetime.now(timezone.utc):
             raise ValueError("Business timestamp cannot be in the future")
         return v
     
@@ -120,12 +120,12 @@ class Event(BaseModel):
     @property
     def age(self) -> float:
         """Get event age in seconds."""
-        return (datetime.utcnow() - self.system_timestamp).total_seconds()
+        return (datetime.now(timezone.utc) - self.system_timestamp).total_seconds()
     
     @property
     def business_age(self) -> float:
         """Get business event age in seconds."""
-        return (datetime.utcnow() - self.business_timestamp).total_seconds()
+        return (datetime.now(timezone.utc) - self.business_timestamp).total_seconds()
 
 
 # Intent Events
@@ -368,7 +368,7 @@ def create_intent_submitted_event(
         aggregate_id=intent.id,
         aggregate_type="intent",
         aggregate_version=1,
-        business_timestamp=business_timestamp or datetime.utcnow(),
+        business_timestamp=business_timestamp or datetime.now(timezone.utc),
         payload=payload,
         metadata=metadata
     )
@@ -397,7 +397,7 @@ def create_intent_status_changed_event(
         aggregate_id=intent_id,
         aggregate_type="intent",
         aggregate_version=aggregate_version,
-        business_timestamp=datetime.utcnow(),
+        business_timestamp=datetime.now(timezone.utc),
         payload=payload,
         metadata=metadata
     )
@@ -427,7 +427,7 @@ def create_strategy_signal_event(
         aggregate_id=strategy_id,
         aggregate_type="strategy",
         aggregate_version=1,
-        business_timestamp=datetime.utcnow(),
+        business_timestamp=datetime.now(timezone.utc),
         payload=payload,
         metadata=metadata
     )

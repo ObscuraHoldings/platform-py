@@ -21,7 +21,6 @@ structlog.configure(
         structlog.stdlib.filter_by_level,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
-        # Include contextvars (e.g., request_id) in every log
         merge_contextvars,
         structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.TimeStamper(fmt="iso"),

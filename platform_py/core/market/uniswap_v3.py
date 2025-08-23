@@ -3,6 +3,7 @@ Uniswap V3 venue adapter.
 """
 
 from typing import List, Dict, Any, Optional
+from decimal import Decimal
 
 from ...types import Asset, TradingPair, Price, OrderBook, Chain, Venue
 from .adapter import VenueAdapter
@@ -14,8 +15,8 @@ class MockWeb3Provider:
     without making actual web3 calls.
     """
     # Corresponds to a WETH price of ~$3000 with 6 decimals for USDC and 18 for WETH
-    # sqrt(3000 * 10**6 / 10**18) * 2**96 = 4295128739
-    SQRT_PRICE_X96 = 4295128739 * (2**96)
+    # sqrt(3000 * 10**6 / 10**18) * 2**96 ≈ 4295128739 (already scaled by 2**96)
+    SQRT_PRICE_X96 = 4295128739
 
     async def get_pool_data(self, pool_address: str) -> Dict[str, Any]:
         # In a real implementation, this would fetch data from the blockchain
@@ -57,11 +58,13 @@ class UniswapV3Adapter(VenueAdapter):
         
         # Formula for Uniswap V3 price from sqrtPriceX96
         # price = (sqrtPriceX96 / 2**96)**2 * (10**base_decimals / 10**quote_decimals)
-        sqrt_price = int(pool_data['sqrtPriceX96'])
-        price_ratio = (sqrt_price / 2**96)**2
+        sqrt_price = Decimal(str(pool_data['sqrtPriceX96']))
+        q96 = Decimal(2) ** 96
+        price_ratio = (sqrt_price / q96) ** 2
         
-        # Adjust for decimals to get human-readable price
-        price_val = price_ratio * (10**pair.base.decimals / 10**pair.quote.decimals)
+        # Adjust for decimals to get human-readable price (use Decimal to avoid float artifacts)
+        decimal_adj = (Decimal(10) ** (pair.base.decimals - pair.quote.decimals))
+        price_val = price_ratio * decimal_adj
         
         return Price(pair=pair, price=price_val, source=await self.get_name())
 
@@ -69,10 +72,25 @@ class UniswapV3Adapter(VenueAdapter):
         # Uniswap V3 doesn't have a traditional order book, but one can be constructed from the liquidity distribution
         # This is a simplified placeholder
         price = await self.get_price(pair)
+        one = Decimal("1")
+        tick = Decimal("0.0001")
+        # Build levels around mid
+        bids_list = [(price.price * (one - tick * Decimal(i)), Decimal("1")) for i in range(1, depth + 1)]
+        asks_list = [(price.price * (one + tick * Decimal(i)), Decimal("1")) for i in range(1, depth + 1)]
+
+        # Enforce best_ask > best_bid strictly (avoid Decimal rounding edge cases)
+        best_bid_price = max(p for p, _ in bids_list)
+        best_ask_price = min(p for p, _ in asks_list)
+        if best_ask_price <= best_bid_price:
+            # Nudge the lowest ask one extra tick above best bid
+            asks_list[0] = (best_bid_price * (one + tick), asks_list[0][1])
+            # Resort asks to keep ascending order
+            asks_list.sort(key=lambda x: x[0])
+
         return OrderBook(
             pair=pair,
-            bids=[(price.price * (1 - 0.0001 * i), 1) for i in range(depth)],
-            asks=[(price.price * (1 + 0.0001 * i), 1) for i in range(depth)],
+            bids=bids_list,
+            asks=asks_list,
         )
 
     async def submit_order(self, order: Dict[str, Any]) -> Dict[str, Any]:

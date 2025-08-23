@@ -38,8 +38,6 @@ class StateCoordinator:
         if await self._is_duplicate(env.eventId):
             return
 
-        await self._persist_event(env)
-
         topic = env.topic
         payload = env.payload
         corr = env.correlationId
@@ -48,8 +46,11 @@ class StateCoordinator:
         if env.sequence is None:
             seq = self._seq_by_corr.get(corr, 0) + 1
             self._seq_by_corr[corr] = seq
+            env.sequence = seq
         else:
             seq = env.sequence
+
+        await self._persist_event(env)
 
         # Minimal state machine for intents (Submitted→Accepted→Planned→Executing→Completed/Failed)
         if topic == "intent.submitted":
@@ -106,18 +107,21 @@ class StateCoordinator:
         # Append to TimescaleDB if available
         if self._db_pool:
             query = (
-                "INSERT INTO events (event_id, topic, correlation_id, causation_id, version, payload) "
-                "VALUES ($1, $2, $3, $4, $5, $6)"
+                "INSERT INTO events (time, event_id, topic, correlation_id, causation_id, version, payload, sequence) "
+                "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
+                "ON CONFLICT DO NOTHING"
             )
             async with self._db_pool.acquire() as conn:
                 await conn.execute(
                     query,
+                    env.timestamp,
                     env.eventId,
                     env.topic,
                     env.correlationId,
                     env.causationId,
                     env.version,
                     json.dumps(env.payload),
+                    env.sequence,
                 )
         # Update Redis read models if available
         if self._redis:

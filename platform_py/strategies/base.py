@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List, Set, Callable
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..types import Intent, Asset, AssetAmount, EventMetadata, create_strategy_signal_event
@@ -212,12 +212,12 @@ class StrategyState:
         self.pending_intents: Set[UUID] = set()
         self.active_orders: Set[UUID] = set()
         self.performance_metrics: Dict[str, float] = {}
-        self.last_update: datetime = datetime.utcnow()
+        self.last_update: datetime = datetime.now(timezone.utc)
     
     def update_position(self, asset: Asset, amount: AssetAmount) -> None:
         """Update position for an asset."""
         self.positions[asset] = amount
-        self.last_update = datetime.utcnow()
+        self.last_update = datetime.now(timezone.utc)
     
     def get_position(self, asset: Asset) -> Optional[AssetAmount]:
         """Get current position for an asset."""
@@ -284,7 +284,7 @@ class BaseStrategy(ABC):
         await self._on_initialize()
         
         self._running = True
-        self._start_time = datetime.utcnow()
+        self._start_time = datetime.now(timezone.utc)
         
         logger.info("Strategy initialized successfully", strategy_id=str(self.strategy_id))
     
@@ -328,7 +328,7 @@ class BaseStrategy(ABC):
     def uptime(self) -> Optional[float]:
         """Get strategy uptime in seconds."""
         if self._start_time:
-            return (datetime.utcnow() - self._start_time).total_seconds()
+            return (datetime.now(timezone.utc) - self._start_time).total_seconds()
         return None
     
     # Abstract methods that strategies must implement

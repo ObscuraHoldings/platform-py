@@ -8,7 +8,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional, Dict, Any, List, Tuple
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from eth_utils import is_checksum_address, to_checksum_address
@@ -228,7 +228,7 @@ class Price(BaseModel):
     
     pair: TradingPair = Field(..., description="Trading pair")
     price: Decimal = Field(..., gt=0, description="Price (quote per base)")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Price timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Price timestamp")
     source: str = Field(..., description="Price source")
     
     @property
@@ -256,7 +256,7 @@ class OrderBook(BaseModel):
     pair: TradingPair = Field(..., description="Trading pair")
     bids: List[Tuple[Decimal, Decimal]] = Field(..., description="List of (price, quantity) for bids")
     asks: List[Tuple[Decimal, Decimal]] = Field(..., description="List of (price, quantity) for asks")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Order book timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Order book timestamp")
     
     @property
     def best_bid(self) -> Optional[Decimal]:
@@ -342,18 +342,18 @@ class BaseEntity(BaseModel):
     """Base entity with common fields."""
     
     id: UUID = Field(default_factory=uuid4, description="Unique identifier")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
     
     def touch(self) -> None:
         """Update the updated_at timestamp."""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
 
 class TimestampedEntity(BaseModel):
     """Entity with timestamp tracking."""
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Timestamp")
     block_number: Optional[int] = Field(None, ge=0, description="Blockchain block number")
     transaction_hash: Optional[str] = Field(None, pattern=r'^0x[a-fA-F0-9]{64}$', description="Transaction hash")
     

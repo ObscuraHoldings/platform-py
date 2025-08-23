@@ -104,7 +104,6 @@ src/
   execution.rs
   lib.rs
   market_data.rs
-  repomix-output.xml
   transaction.rs</directory_structure><files>This section contains the contents of the repository&apos;s files.<file path="platform_py/agent/__init__.py">__all__ = [&quot;AgentFramework&quot;, &quot;CoordinationService&quot;]</file><file path="platform_py/agent/coordination.py">class CoordinationService
 ⋮----
 def __init__(self)
@@ -174,38 +173,7 @@ req = json.loads(sub_msg)
 topics: List[str] = req.get(&quot;topics&quot;, [&quot;intent.*&quot;, &quot;plan.*&quot;, &quot;exec.*&quot;])
 handler = await make_handler()
 ⋮----
-data = await queue.get()</file><file path="platform_py/chain_monitor/__init__.py">__all__ = [&quot;ChainWatcher&quot;]</file><file path="platform_py/chain_monitor/watcher.py">logger = structlog.get_logger()
-class ChainWatcher
-⋮----
-def __init__(self, chain_id: int, event_stream: EventStream)
-def _get_rpc_url(self) -&gt; str
-⋮----
-url = config.get_rpc_url(self.chain_id)
-⋮----
-async def start(self)
-async def stop(self)
-async def _poll_for_events(self)
-⋮----
-last_processed_block = await asyncio.to_thread(self.w3.eth.get_block_number) - 1
-⋮----
-latest_block = await asyncio.to_thread(self.w3.eth.get_block_number)
-⋮----
-block = await asyncio.to_thread(self.w3.eth.get_block, block_number, full_transactions=True)
-⋮----
-class DecodedTxPayload(EventPayload)
-⋮----
-def get_event_type(self) -&gt; str: return &quot;transaction.decoded&quot;
-raw_hex = await asyncio.to_thread(self._try_get_raw_tx_hex, tx)
-decoded_tx = decode_transaction(raw_hex if raw_hex else tx)
-event = Event(
-⋮----
-last_processed_block = block_number
-⋮----
-def _try_get_raw_tx_hex(self, tx: Any) -&gt; Optional[str]
-⋮----
-tx_hash = tx.hash if hasattr(tx, &quot;hash&quot;) else tx.get(&quot;hash&quot;)
-⋮----
-raw = self.w3.eth.get_raw_transaction(tx_hash)</file><file path="platform_py/core/execution/__init__.py">__all__ = [&quot;ExecutionPlanner&quot;, &quot;ExecutionPlan&quot;, &quot;VenueManager&quot;]</file><file path="platform_py/core/execution/orchestrator.py">logger = structlog.get_logger()
+data = await queue.get()</file><file path="platform_py/chain_monitor/__init__.py">__all__ = [&quot;ChainWatcher&quot;]</file><file path="platform_py/core/execution/__init__.py">__all__ = [&quot;ExecutionPlanner&quot;, &quot;ExecutionPlan&quot;, &quot;VenueManager&quot;]</file><file path="platform_py/core/execution/orchestrator.py">logger = structlog.get_logger()
 class ExecutionOrchestrator
 ⋮----
 def __init__(self, venue_manager: VenueManager, event_stream: EventStream)
@@ -400,70 +368,7 @@ priority = int(priority_score * 10)
 ⋮----
 def _prepare_features(self, features: Dict[str, Any]) -&gt; Any
 ⋮----
-feature_vector = list(features.values())</file><file path="platform_py/core/intent/processor.py">logger = structlog.get_logger()
-⋮----
-@ray.remote(num_cpus=config.ray.num_cpus, num_gpus=config.ray.num_gpus)
-class IntentProcessor
-⋮----
-def __init__(self, processor_id: str)
-async def initialize(self) -&gt; None
-⋮----
-model_path = config.ml.model_cache_dir + &quot;/intent_decomposer.onnx&quot;
-⋮----
-providers = [&apos;CUDAExecutionProvider&apos;] if config.ray.num_gpus &gt; 0 else [&apos;CPUExecutionProvider&apos;]
-⋮----
-async def process_intent(self, intent: Intent) -&gt; List[Intent]
-⋮----
-sub_intents = await self._decompose_intent(intent)
-optimized_intents = []
-⋮----
-optimized = await self._optimize_intent(sub_intent)
-⋮----
-async def _fallback_processing(self, intent: Intent) -&gt; List[Intent]
-⋮----
-sub_intents = []
-⋮----
-sub_intent = intent.copy(deep=True)
-⋮----
-async def _decompose_intent(self, intent: Intent) -&gt; List[Intent]
-⋮----
-features = self._prepare_decomposition_features(intent)
-input_name = self.ml_decomposer.get_inputs()[0].name
-result = self.ml_decomposer.run(None, {input_name: features})
-⋮----
-def _prepare_decomposition_features(self, intent: Intent) -&gt; Any
-⋮----
-features = [len(intent.assets), intent.priority]
-⋮----
-fixed_size = 50
-⋮----
-features = features[:fixed_size]
-⋮----
-def _create_sub_intents_from_ml(self, original_intent: Intent, ml_result: Any) -&gt; List[Intent]
-⋮----
-# For now, we&apos;ll just split the assets into individual intents
-⋮----
-sub_intent = original_intent.copy(deep=True)
-⋮----
-async def _optimize_intent(self, intent: Intent) -&gt; Intent
-class DistributedIntentPipeline
-⋮----
-def __init__(self, num_processors: int = 4)
-async def initialize_processors(self) -&gt; None
-⋮----
-futures = [processor.initialize.remote() for processor in self.processors]
-⋮----
-async def process_intents(self, intents: List[Intent]) -&gt; List[Intent]
-⋮----
-futures = []
-⋮----
-processor = self.processors[i % self.num_processors]
-⋮----
-results = await asyncio.gather(*futures)
-all_sub_intents = [sub_intent for sub_intent_list in results for sub_intent in sub_intent_list]
-⋮----
-async def shutdown(self) -&gt; None
-def get_cluster_status(self) -&gt; Dict[str, Any]</file><file path="platform_py/core/intent/validator.py">logger = structlog.get_logger()
+feature_vector = list(features.values())</file><file path="platform_py/core/intent/validator.py">logger = structlog.get_logger()
 class IntentValidator
 ⋮----
 def __init__(self, db_pool: asyncpg.Pool)
@@ -507,7 +412,7 @@ async def _validate_against_portfolio(self, intent: Intent) -&gt; Tuple[List[str
 @abstractmethod
     async def get_order_status(self, order_id: str) -&gt; Dict[str, Any]</file><file path="platform_py/core/market/uniswap_v3.py">class MockWeb3Provider
 ⋮----
-SQRT_PRICE_X96 = 4295128739 * (2**96)
+SQRT_PRICE_X96 = 4295128739
 async def get_pool_data(self, pool_address: str) -&gt; Dict[str, Any]
 class UniswapV3Adapter(VenueAdapter)
 ⋮----
@@ -520,13 +425,21 @@ async def get_price(self, pair: TradingPair) -&gt; Price
 provider = self.web3_providers.get(pair.base.chain_id)
 ⋮----
 pool_data = await provider.get_pool_data(pair.pool_address)
-sqrt_price = int(pool_data[&apos;sqrtPriceX96&apos;])
-price_ratio = (sqrt_price / 2**96)**2
-price_val = price_ratio * (10**pair.base.decimals / 10**pair.quote.decimals)
+sqrt_price = Decimal(str(pool_data[&apos;sqrtPriceX96&apos;]))
+q96 = Decimal(2) ** 96
+price_ratio = (sqrt_price / q96) ** 2
+decimal_adj = (Decimal(10) ** (pair.base.decimals - pair.quote.decimals))
+price_val = price_ratio * decimal_adj
 ⋮----
 async def get_order_book(self, pair: TradingPair, depth: int = 20) -&gt; OrderBook
 ⋮----
 price = await self.get_price(pair)
+one = Decimal(&quot;1&quot;)
+tick = Decimal(&quot;0.0001&quot;)
+bids_list = [(price.price * (one - tick * Decimal(i)), Decimal(&quot;1&quot;)) for i in range(1, depth + 1)]
+asks_list = [(price.price * (one + tick * Decimal(i)), Decimal(&quot;1&quot;)) for i in range(1, depth + 1)]
+best_bid_price = max(p for p, _ in bids_list)
+best_ask_price = min(p for p, _ in asks_list)
 ⋮----
 async def submit_order(self, order: Dict[str, Any]) -&gt; Dict[str, Any]
 async def get_order_status(self, order_id: str) -&gt; Dict[str, Any]</file><file path="platform_py/core/__init__.py">__all__ = []</file><file path="platform_py/governance/__init__.py">__all__ = [&quot;GovernanceGateway&quot;, &quot;PolicyEngine&quot;]</file><file path="platform_py/governance/gateway.py">class GovernanceGateway
@@ -690,7 +603,7 @@ async def generate_intents(self, market_data: Dict[str, Any]) -&gt; List[Intent]
 ⋮----
 intents = []
 ⋮----
-should_rebalance = (datetime.utcnow() - self._last_rebalance) &gt; self.rebalance_frequency
+should_rebalance = (datetime.now(timezone.utc) - self._last_rebalance) &gt; self.rebalance_frequency
 # Generate signals for each target asset
 ⋮----
 asset_symbol = asset_config.get(&quot;symbol&quot;)
@@ -742,7 +655,7 @@ trade_amount = target_weight * signal_adjustment * risk_adjustment
 ⋮----
 async def _update_price_history(self, market_data: Dict[str, Any]) -&gt; None
 ⋮----
-timestamp = datetime.utcnow()
+timestamp = datetime.now(timezone.utc)
 ⋮----
 asset_data = market_data[asset_symbol]
 new_row = pl.DataFrame({
@@ -926,7 +839,218 @@ schema = self.manifest.config_schema
 value = self.config[key]
 value_type = requirements.get(&apos;type&apos;)
 ⋮----
-async def health_check(self) -&gt; Dict[str, Any]</file><file path="platform_py/streaming/__init__.py">__all__ = [&quot;EventStream&quot;, &quot;StreamConfig&quot;]</file><file path="platform_py/types/__init__.py">__all__ = [</file><file path="platform_py/types/common.py">class Chain(Enum)
+async def health_check(self) -&gt; Dict[str, Any]</file><file path="platform_py/streaming/__init__.py">__all__ = [&quot;EventStream&quot;, &quot;StreamConfig&quot;]</file><file path="platform_py/types/__init__.py">__all__ = [</file><file path="platform_py/types/envelope.py">_CROCKFORD32 = &quot;0123456789ABCDEFGHJKMNPQRSTVWXYZ&quot;
+def _encode_base32(data: bytes) -&gt; str
+⋮----
+bits = 0
+value = 0
+out = []
+⋮----
+value = (value &lt;&lt; 8) | b
+⋮----
+def ulid(ts: Optional[datetime] = None) -&gt; str
+⋮----
+now = ts or datetime.now(timezone.utc)
+ms = int(now.timestamp() * 1000)
+time_bytes = ms.to_bytes(6, byteorder=&quot;big&quot;)
+rand_bytes = os.urandom(10)
+⋮----
+class EventEnvelope(BaseModel)
+⋮----
+eventId: str = Field(..., description=&quot;ULID event identifier&quot;)
+timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+topic: str
+correlationId: str
+causationId: Optional[str] = None
+payload: Dict[str, Any]
+version: int = 1
+sequence: Optional[int] = None</file><file path="platform_py/__init__.py">_builtin_platform = importlib.import_module(&quot;platform&quot;)</file><file path="platform_py/dependencies.py">logger = structlog.get_logger()
+class CoreComponents
+⋮----
+def __init__(self)
+async def initialize(self) -&gt; None
+⋮----
+risk_engine = RiskEngine()
+⋮----
+async def _subscribe_state_coordinator(self, event_stream)
+⋮----
+async def handler(evt: dict)
+⋮----
+env = EventEnvelope(**evt)
+⋮----
+async def shutdown(self) -&gt; None
+components = CoreComponents()</file><file path="platform_py/setup_event_loop.py">logger = logging.getLogger(__name__)
+def setup_event_loop() -&gt; None</file><file path="src/lib.rs">mod execution;
+mod chain_monitor;
+mod market_data;
+mod transaction;
+⋮----
+.enable_all()
+.thread_name(&quot;platform-rt&quot;)
+.max_blocking_threads(1024)
+.build()
+.expect(&quot;tokio runtime&quot;)
+⋮----
+pub fn initialize_rust_runtime() -&gt; PyResult&lt;()&gt; {
+let _ = TRACING_INIT.get_or_init(|| {
+⋮----
+Ok(())
+⋮----
+pub fn runtime_handle() -&gt; &amp;&apos;static tokio::runtime::Handle {
+GLOBAL_RUNTIME.handle()
+⋮----
+fn platform_rust(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+m.add_function(wrap_pyfunction!(initialize_rust_runtime, m)?)?;</file><file path="platform_py/chain_monitor/watcher.py">logger = structlog.get_logger()
+class ChainWatcher
+⋮----
+def __init__(self, chain_id: int, event_stream: EventStream)
+def _get_rpc_url(self) -&gt; str
+⋮----
+url = config.get_rpc_url(self.chain_id)
+⋮----
+async def start(self)
+async def stop(self)
+async def _poll_for_events(self)
+⋮----
+last_processed_block = await asyncio.to_thread(self.w3.eth.get_block_number) - 1
+⋮----
+latest_block = await asyncio.to_thread(self.w3.eth.get_block_number)
+⋮----
+block = await asyncio.to_thread(self.w3.eth.get_block, block_number, full_transactions=True)
+⋮----
+class DecodedTxPayload(EventPayload)
+⋮----
+def get_event_type(self) -&gt; str: return &quot;transaction.decoded&quot;
+raw_hex = await asyncio.to_thread(self._try_get_raw_tx_hex, tx)
+decoded_tx = decode_transaction(raw_hex if raw_hex else tx)
+event = Event(
+⋮----
+last_processed_block = block_number
+⋮----
+def _try_get_raw_tx_hex(self, tx: Any) -&gt; Optional[str]
+⋮----
+tx_hash = tx.hash if hasattr(tx, &quot;hash&quot;) else tx.get(&quot;hash&quot;)
+⋮----
+raw = self.w3.eth.get_raw_transaction(tx_hash)</file><file path="platform_py/core/intent/processor.py">logger = structlog.get_logger()
+⋮----
+@ray.remote(num_cpus=config.ray.num_cpus, num_gpus=config.ray.num_gpus)
+class IntentProcessor
+⋮----
+def __init__(self, processor_id: str)
+async def initialize(self) -&gt; None
+⋮----
+model_path = config.ml.model_cache_dir + &quot;/intent_decomposer.onnx&quot;
+⋮----
+providers = [&apos;CUDAExecutionProvider&apos;] if config.ray.num_gpus &gt; 0 else [&apos;CPUExecutionProvider&apos;]
+⋮----
+async def process_intent(self, intent: Intent) -&gt; List[Intent]
+⋮----
+sub_intents = await self._decompose_intent(intent)
+optimized_intents = []
+⋮----
+optimized = await self._optimize_intent(sub_intent)
+⋮----
+async def _fallback_processing(self, intent: Intent) -&gt; List[Intent]
+⋮----
+sub_intents = []
+⋮----
+sub_intent = intent.copy(deep=True)
+⋮----
+async def _decompose_intent(self, intent: Intent) -&gt; List[Intent]
+⋮----
+features = self._prepare_decomposition_features(intent)
+input_name = self.ml_decomposer.get_inputs()[0].name
+result = self.ml_decomposer.run(None, {input_name: features})
+⋮----
+def _prepare_decomposition_features(self, intent: Intent) -&gt; Any
+⋮----
+features = [len(intent.assets), intent.priority]
+⋮----
+fixed_size = 50
+⋮----
+features = features[:fixed_size]
+⋮----
+def _create_sub_intents_from_ml(self, original_intent: Intent, ml_result: Any) -&gt; List[Intent]
+⋮----
+# For now, we&apos;ll just split the assets into individual intents
+⋮----
+sub_intent = original_intent.copy(deep=True)
+⋮----
+async def _optimize_intent(self, intent: Intent) -&gt; Intent
+class DistributedIntentPipeline
+⋮----
+def __init__(self, num_processors: int = 4)
+async def initialize_processors(self) -&gt; None
+⋮----
+futures = [processor.initialize.remote() for processor in self.processors]
+⋮----
+async def process_intents(self, intents: List[Intent]) -&gt; List[Intent]
+⋮----
+futures = []
+⋮----
+processor = self.processors[i % self.num_processors]
+⋮----
+results = await asyncio.gather(*futures)
+all_sub_intents = [sub_intent for sub_intent_list in results for sub_intent in sub_intent_list]
+⋮----
+async def shutdown(self) -&gt; None
+def get_cluster_status(self) -&gt; Dict[str, Any]</file><file path="platform_py/streaming/event_stream.py">logger = structlog.get_logger()
+⋮----
+@dataclass
+class StreamConfig
+⋮----
+stream_name: str = &quot;platform_events&quot;
+subjects: List[str] = field(default_factory=lambda: [
+durable_name: str = &quot;platform_worker&quot;
+retention_policy: str = &quot;workqueue&quot;
+max_age_seconds: int = 86400
+class EventStream
+⋮----
+def __init__(self, nats_config=config.nats, redis_config=config.redis, stream_config=StreamConfig())
+async def initialize(self) -&gt; None
+async def _setup_jetstream(self) -&gt; None
+⋮----
+stream = await self.jetstream.add_stream(
+⋮----
+async def shutdown(self) -&gt; None
+async def publish(self, subject: str, event: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -&gt; None
+⋮----
+dedup_id = event.get(&apos;id&apos;, str(UUID()))
+message_data = json.dumps(event).encode(&apos;utf-8&apos;)
+⋮----
+ack = await self.jetstream.publish(
+⋮----
+async def subscribe(self, subject: str, handler: Callable[[Dict[str, Any]], None], durable_name: Optional[str] = None) -&gt; None
+⋮----
+durable = durable_name or f&quot;{self.stream_config.durable_name}_{subject.replace(&apos;.*&apos;, &apos;_wildcard&apos;)}&quot;
+async def message_handler(msg)
+⋮----
+event_data = json.loads(msg.data.decode())
+⋮----
+async def publish_envelope(self, env: EventEnvelope, headers: Optional[Dict[str, str]] = None) -&gt; None
+⋮----
+data = env.model_dump()
+msg_id = env.eventId
+⋮----
+async def _buffer_in_redis(self, subject: str, event: Dict[str, Any]) -&gt; None
+⋮----
+stream_key = f&quot;events:{subject}&quot;
+pipeline = self.redis_client.pipeline()
+⋮----
+async def get_stream_state(self, stream_name: Optional[str] = None) -&gt; Optional[Dict[str, Any]]
+⋮----
+stream_info = await self.jetstream.stream_info(stream_name or self.stream_config.stream_name)
+⋮----
+async def replay_events_from_redis(self, subject: str, from_timestamp_ms: int, to_timestamp_ms: Optional[int] = None) -&gt; List[Dict[str, Any]]
+⋮----
+start = from_timestamp_ms
+end = to_timestamp_ms or &quot;+&quot;
+results = await self.redis_client.xrange(stream_key, start, end)
+⋮----
+async def _nats_error_cb(self, e)
+async def _nats_reconnected_cb(self)
+async def _nats_disconnected_cb(self)
+async def _nats_closed_cb(self)</file><file path="platform_py/types/common.py">class Chain(Enum)
 ⋮----
 ETHEREUM = 1
 ARBITRUM = 42161
@@ -960,10 +1084,10 @@ chain_id: int = Field(..., gt=0, description=&quot;Blockchain network ID&quot;)
 name: Optional[str] = Field(None, max_length=100, description=&quot;Asset name&quot;)
 coingecko_id: Optional[str] = Field(None, description=&quot;CoinGecko API ID&quot;)
 ⋮----
-@validator(&apos;address&apos;)
+@field_validator(&apos;address&apos;)
     def validate_checksum_address(cls, v: str) -&gt; str
 ⋮----
-@validator(&apos;chain_id&apos;)
+@field_validator(&apos;chain_id&apos;)
     def validate_supported_chain(cls, v: int) -&gt; int
 ⋮----
 supported_chains = [chain.value for chain in Chain]
@@ -975,9 +1099,7 @@ supported_chains = [chain.value for chain in Chain]
     def unique_id(self) -&gt; str
 def __hash__(self) -&gt; int
 def __eq__(self, other) -&gt; bool
-class Config
-⋮----
-frozen = True
+model_config = ConfigDict(frozen=True)
 class TradingPair(BaseModel)
 ⋮----
 base: Asset = Field(..., description=&quot;Base asset&quot;)
@@ -986,13 +1108,13 @@ venue: Venue = Field(..., description=&quot;Trading venue&quot;)
 pool_address: Optional[str] = Field(None, pattern=r&apos;^0x[a-fA-F0-9]{40}$&apos;, description=&quot;Pool contract address&quot;)
 fee_tier: Optional[int] = Field(None, ge=0, description=&quot;Fee tier in basis points&quot;)
 ⋮----
-@root_validator(skip_on_failure=True)
-    def validate_same_chain(cls, values)
+@model_validator(mode=&apos;after&apos;)
+    def validate_same_chain(self)
 ⋮----
-base = values.get(&apos;base&apos;)
-quote = values.get(&apos;quote&apos;)
+base = self.base
+quote = self.quote
 ⋮----
-@validator(&apos;pool_address&apos;)
+@field_validator(&apos;pool_address&apos;)
     def validate_pool_address(cls, v: Optional[str]) -&gt; Optional[str]
 ⋮----
 @property
@@ -1006,10 +1128,11 @@ class AssetAmount(BaseModel)
 asset: Asset = Field(..., description=&quot;Asset reference&quot;)
 amount: Decimal = Field(..., ge=0, description=&quot;Amount in asset units&quot;)
 ⋮----
-@validator(&apos;amount&apos;)
-    def validate_amount_precision(cls, v: Decimal, values: Dict[str, Any]) -&gt; Decimal
+@model_validator(mode=&apos;after&apos;)
+    def validate_amount_precision(self) -&gt; &apos;AssetAmount&apos;
 ⋮----
-asset = values.get(&apos;asset&apos;)
+asset = self.asset
+v = self.amount
 ⋮----
 decimal_places = abs(v.as_tuple().exponent)
 ⋮----
@@ -1033,7 +1156,7 @@ class Price(BaseModel)
 ⋮----
 pair: TradingPair = Field(..., description=&quot;Trading pair&quot;)
 price: Decimal = Field(..., gt=0, description=&quot;Price (quote per base)&quot;)
-timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Price timestamp&quot;)
+timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description=&quot;Price timestamp&quot;)
 source: str = Field(..., description=&quot;Price source&quot;)
 ⋮----
 @property
@@ -1050,7 +1173,7 @@ class OrderBook(BaseModel)
 ⋮----
 bids: List[Tuple[Decimal, Decimal]] = Field(..., description=&quot;List of (price, quantity) for bids&quot;)
 asks: List[Tuple[Decimal, Decimal]] = Field(..., description=&quot;List of (price, quantity) for asks&quot;)
-timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Order book timestamp&quot;)
+timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description=&quot;Order book timestamp&quot;)
 ⋮----
 @property
     def best_bid(self) -&gt; Optional[Decimal]
@@ -1079,16 +1202,16 @@ USDC_ARBITRUM = Asset(
 class BaseEntity(BaseModel)
 ⋮----
 id: UUID = Field(default_factory=uuid4, description=&quot;Unique identifier&quot;)
-created_at: datetime = Field(default_factory=datetime.utcnow, description=&quot;Creation timestamp&quot;)
+created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description=&quot;Creation timestamp&quot;)
 updated_at: Optional[datetime] = Field(None, description=&quot;Last update timestamp&quot;)
 def touch(self) -&gt; None
 class TimestampedEntity(BaseModel)
 ⋮----
-timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Timestamp&quot;)
+timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description=&quot;Timestamp&quot;)
 block_number: Optional[int] = Field(None, ge=0, description=&quot;Blockchain block number&quot;)
 transaction_hash: Optional[str] = Field(None, pattern=r&apos;^0x[a-fA-F0-9]{64}$&apos;, description=&quot;Transaction hash&quot;)
 ⋮----
-@validator(&apos;transaction_hash&apos;)
+@field_validator(&apos;transaction_hash&apos;, mode=&apos;before&apos;)
     def validate_tx_hash(cls, v: Optional[str]) -&gt; Optional[str]
 class ValidationMixin
 ⋮----
@@ -1103,38 +1226,10 @@ def get_asset_by_address(address: str, chain_id: int) -&gt; Optional[Asset]
 def create_trading_pair(base_key: str, quote_key: str, venue: Venue) -&gt; Optional[TradingPair]
 ⋮----
 base = get_asset_by_key(base_key)
-quote = get_asset_by_key(quote_key)</file><file path="platform_py/types/envelope.py">_CROCKFORD32 = &quot;0123456789ABCDEFGHJKMNPQRSTVWXYZ&quot;
-def _encode_base32(data: bytes) -&gt; str
-⋮----
-bits = 0
-value = 0
-out = []
-⋮----
-value = (value &lt;&lt; 8) | b
-⋮----
-def ulid(ts: Optional[datetime] = None) -&gt; str
-⋮----
-now = ts or datetime.now(timezone.utc)
-ms = int(now.timestamp() * 1000)
-time_bytes = ms.to_bytes(6, byteorder=&quot;big&quot;)
-rand_bytes = os.urandom(10)
-⋮----
-class EventEnvelope(BaseModel)
-⋮----
-eventId: str = Field(..., description=&quot;ULID event identifier&quot;)
-timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-topic: str
-correlationId: str
-causationId: Optional[str] = None
-payload: Dict[str, Any]
-version: int = 1
-sequence: Optional[int] = None</file><file path="platform_py/types/events.py">EventPayloadType = TypeVar(&apos;EventPayloadType&apos;, bound=&apos;EventPayload&apos;)
+quote = get_asset_by_key(quote_key)</file><file path="platform_py/types/events.py">EventPayloadType = TypeVar(&apos;EventPayloadType&apos;, bound=&apos;EventPayload&apos;)
 class EventPayload(BaseModel, ABC)
 ⋮----
-class Config
-⋮----
-arbitrary_types_allowed = True
-json_encoders = {
+model_config = ConfigDict(arbitrary_types_allowed=True)
 ⋮----
 @abstractmethod
     def get_event_type(self) -&gt; str
@@ -1157,14 +1252,14 @@ aggregate_id: UUID = Field(..., description=&quot;ID of the aggregate this event
 aggregate_type: str = Field(..., description=&quot;Type of the aggregate&quot;)
 aggregate_version: int = Field(..., ge=1, description=&quot;Version of the aggregate after this event&quot;)
 business_timestamp: datetime = Field(..., description=&quot;When the business event occurred&quot;)
-system_timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;When event was recorded&quot;)
+system_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description=&quot;When event was recorded&quot;)
 payload: EventPayload = Field(..., description=&quot;Event payload data&quot;)
 metadata: EventMetadata = Field(..., description=&quot;Event metadata&quot;)
 signature: Optional[bytes] = Field(None, description=&quot;Digital signature for audit trail&quot;)
 signer_public_key: Optional[bytes] = Field(None, description=&quot;Public key of the signer&quot;)
 hash: Optional[str] = Field(None, description=&quot;Event content hash&quot;)
 ⋮----
-@validator(&apos;business_timestamp&apos;)
+@field_validator(&apos;business_timestamp&apos;)
     def validate_business_timestamp(cls, v: datetime) -&gt; datetime
 def get_signing_message(self) -&gt; bytes
 ⋮----
@@ -1368,16 +1463,14 @@ feature_vector: Optional[List[float]] = Field(None, description=&quot;Feature ve
 confidence_threshold: Optional[float] = Field(None, ge=0, le=1, description=&quot;ML confidence threshold&quot;)
 use_ml_optimization: bool = Field(default=True, description=&quot;Enable ML-based optimization&quot;)
 ⋮----
-@validator(&apos;max_fill_size&apos;)
-    def validate_fill_sizes(cls, v: Optional[Decimal], values: Dict[str, Any]) -&gt; Optional[Decimal]
+@model_validator(mode=&apos;after&apos;)
+    def validate_fill_sizes(self) -&gt; &apos;IntentConstraints&apos;
 ⋮----
-min_size = values[&apos;min_fill_size&apos;]
+@model_validator(mode=&apos;after&apos;)
+    def validate_venue_constraints(self)
 ⋮----
-@root_validator(skip_on_failure=True)
-    def validate_venue_constraints(cls, values)
-⋮----
-allowed = values.get(&apos;allowed_venues&apos;, [])
-excluded = values.get(&apos;excluded_venues&apos;, [])
+allowed = self.allowed_venues or []
+excluded = self.excluded_venues or []
 ⋮----
 overlap = set(allowed) &amp; set(excluded)
 ⋮----
@@ -1388,12 +1481,12 @@ amount: Optional[Decimal] = Field(None, ge=0, description=&quot;Specific amount 
 percentage: Optional[Decimal] = Field(None, ge=0, le=1, description=&quot;Percentage of portfolio&quot;)
 target_weight: Optional[Decimal] = Field(None, ge=0, le=1, description=&quot;Target portfolio weight&quot;)
 ⋮----
-@root_validator(skip_on_failure=True)
-    def validate_amount_spec(cls, values)
+@model_validator(mode=&apos;after&apos;)
+    def validate_amount_spec(self)
 ⋮----
-amount = values.get(&apos;amount&apos;)
-percentage = values.get(&apos;percentage&apos;)
-target_weight = values.get(&apos;target_weight&apos;)
+amount = self.amount
+percentage = self.percentage
+target_weight = self.target_weight
 specified = sum(x is not None for x in [amount, percentage, target_weight])
 ⋮----
 class MLFeatures(BaseModel)
@@ -1415,10 +1508,10 @@ class Intent(BaseModel)
 id: UUID = Field(default_factory=uuid4, description=&quot;Unique intent ID&quot;)
 strategy_id: UUID = Field(..., description=&quot;Strategy that generated this intent&quot;)
 parent_intent_id: Optional[UUID] = Field(None, description=&quot;Parent intent if this is a sub-intent&quot;)
-timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Intent creation timestamp&quot;)
+timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description=&quot;Intent creation timestamp&quot;)
 expires_at: Optional[datetime] = Field(None, description=&quot;Intent expiration time&quot;)
 type: IntentType = Field(..., description=&quot;Intent type&quot;)
-assets: List[AssetSpec] = Field(..., min_items=1, description=&quot;Assets to trade&quot;)
+assets: List[AssetSpec] = Field(..., min_length=1, description=&quot;Assets to trade&quot;)
 constraints: IntentConstraints = Field(..., description=&quot;Execution constraints&quot;)
 priority: int = Field(default=5, ge=1, le=10, description=&quot;Intent priority (1=lowest, 10=highest)&quot;)
 metadata: Dict[str, Any] = Field(default_factory=dict, description=&quot;Additional metadata&quot;)
@@ -1433,12 +1526,12 @@ filled_amount: Optional[Decimal] = Field(default=Decimal(&apos;0&apos;), ge=0, d
 average_price: Optional[Decimal] = Field(None, description=&quot;Average execution price&quot;)
 total_gas_used: Optional[Decimal] = Field(default=Decimal(&apos;0&apos;), ge=0, description=&quot;Total gas used&quot;)
 ⋮----
-@validator(&apos;expires_at&apos;)
-    def validate_expiration(cls, v: Optional[datetime], values: Dict[str, Any]) -&gt; Optional[datetime]
+@model_validator(mode=&apos;after&apos;)
+    def validate_expiration(self) -&gt; &apos;Intent&apos;
 ⋮----
-timestamp = values.get(&apos;timestamp&apos;, datetime.utcnow())
+ts = self.timestamp or datetime.now(timezone.utc)
 ⋮----
-@validator(&apos;assets&apos;)
+@field_validator(&apos;assets&apos;)
     def validate_assets_not_empty(cls, v: List[AssetSpec]) -&gt; List[AssetSpec]
 ⋮----
 @property
@@ -1447,7 +1540,7 @@ timestamp = values.get(&apos;timestamp&apos;, datetime.utcnow())
 @property
     def time_remaining(self) -&gt; Optional[timedelta]
 ⋮----
-remaining = self.expires_at - datetime.utcnow()
+remaining = self.expires_at - datetime.now(timezone.utc)
 ⋮----
 @property
     def is_multi_asset(self) -&gt; bool
@@ -1464,14 +1557,14 @@ primary_spec = self.assets[0]
 class IntentReceipt(BaseModel)
 ⋮----
 intent_id: UUID = Field(..., description=&quot;Intent ID&quot;)
-received: datetime = Field(default_factory=datetime.utcnow, description=&quot;Receipt timestamp&quot;)
+received: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description=&quot;Receipt timestamp&quot;)
 status: IntentStatus = Field(default=IntentStatus.PENDING, description=&quot;Initial status&quot;)
 estimated_execution_time: Optional[timedelta] = Field(None, description=&quot;Estimated execution time&quot;)
 warnings: Optional[List[str]] = Field(None, description=&quot;Validation warnings&quot;)
 queue_position: Optional[int] = Field(None, description=&quot;Position in execution queue&quot;)
 class IntentUpdate(BaseModel)
 ⋮----
-timestamp: datetime = Field(default_factory=datetime.utcnow, description=&quot;Update timestamp&quot;)
+timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description=&quot;Update timestamp&quot;)
 old_status: IntentStatus = Field(..., description=&quot;Previous status&quot;)
 new_status: IntentStatus = Field(..., description=&quot;New status&quot;)
 reason: Optional[str] = Field(None, description=&quot;Reason for status change&quot;)
@@ -1507,8 +1600,23 @@ value: Optional[int] = None
 input: Optional[str] = None
 hash: Optional[str] = None
 ⋮----
-@validator(&quot;input&quot;)
-    def ensure_hex_prefix(cls, v: Optional[str]) -&gt; Optional[str]</file><file path="platform_py/__init__.py">_builtin_platform = importlib.import_module(&quot;platform&quot;)</file><file path="platform_py/config.py">class DatabaseConfig(PydanticBaseSettings)
+@field_validator(&quot;input&quot;, mode=&apos;before&apos;)
+    def ensure_hex_prefix(cls, v: Optional[str]) -&gt; Optional[str]</file><file path="platform_py/app.py">logger = structlog.get_logger()
+⋮----
+@asynccontextmanager
+async def lifespan(app: FastAPI) -&gt; AsyncGenerator[None, None]
+def create_app() -&gt; FastAPI
+⋮----
+app = FastAPI(
+⋮----
+async def request_id_dispatch(request, call_next)
+⋮----
+req_id = request.headers.get(&quot;X-Request-ID&quot;) or str(uuid.uuid4())
+⋮----
+response = await call_next(request)
+⋮----
+@app.get(&quot;/health&quot;)
+    async def health_check()</file><file path="platform_py/config.py">class DatabaseConfig(PydanticBaseSettings)
 ⋮----
 host: str = Field(default=&quot;localhost&quot;, description=&quot;Database host&quot;)
 port: int = Field(default=5432, description=&quot;Database port&quot;)
@@ -1597,22 +1705,7 @@ event_buffer_size: int = Field(default=1000, description=&quot;Event buffer size
 enable_legacy_intent_queue: bool = Field(default=False, description=&quot;Enable legacy intent queue processor&quot;)
 model_config = SettingsConfigDict(
 def get_rpc_url(self, chain_id: int) -&gt; str
-config = PlatformConfig()</file><file path="platform_py/dependencies.py">logger = structlog.get_logger()
-class CoreComponents
-⋮----
-def __init__(self)
-async def initialize(self) -&gt; None
-⋮----
-risk_engine = RiskEngine()
-⋮----
-async def _subscribe_state_coordinator(self, event_stream)
-⋮----
-async def handler(evt: dict)
-⋮----
-env = EventEnvelope(**evt)
-⋮----
-async def shutdown(self) -&gt; None
-components = CoreComponents()</file><file path="platform_py/rust_bindings.py">logger = structlog.get_logger()
+config = PlatformConfig()</file><file path="platform_py/rust_bindings.py">logger = structlog.get_logger()
 _platform_rust = None
 ⋮----
 def _fallback_decode_transaction(tx: Any) -&gt; Dict[str, Any]
@@ -1640,12 +1733,12 @@ decoded = _platform_rust.decode_transaction(tx)
 def optimize_route(params: Dict[str, Any]) -&gt; Dict[str, Any]
 ⋮----
 engine = _platform_rust.ExecutionEngine()
-result = engine.optimize_route(parsed.dict())
+result = engine.optimize_route(parsed.model_dump())
 ⋮----
 def simulate_transaction(step: Dict[str, Any]) -&gt; Dict[str, Any]
 def aggregate_order_books(books: List[Any]) -&gt; Any
 ⋮----
-entries = [AggregateOrderBookEntry.parse_obj(b).dict() for b in books]
+entries = [AggregateOrderBookEntry.model_validate(b).model_dump() for b in books]
 ⋮----
 result = _platform_rust.aggregate_order_books(entries)</file><file path="platform_py/services.py">logger = structlog.get_logger()
 class ServiceConnector
@@ -1656,493 +1749,7 @@ async def connect_all(self) -&gt; None
 max_size = getattr(config.database, &quot;max_size&quot;, None) or config.database.max_overflow
 ⋮----
 async def disconnect_all(self) -&gt; None
-services = ServiceConnector()</file><file path="platform_py/setup_event_loop.py">logger = logging.getLogger(__name__)
-def setup_event_loop() -&gt; None</file><file path="src/lib.rs">mod execution;
-mod chain_monitor;
-mod market_data;
-mod transaction;
-⋮----
-.enable_all()
-.thread_name(&quot;platform-rt&quot;)
-.max_blocking_threads(1024)
-.build()
-.expect(&quot;tokio runtime&quot;)
-⋮----
-pub fn initialize_rust_runtime() -&gt; PyResult&lt;()&gt; {
-let _ = TRACING_INIT.get_or_init(|| {
-⋮----
-Ok(())
-⋮----
-pub fn runtime_handle() -&gt; &amp;&apos;static tokio::runtime::Handle {
-GLOBAL_RUNTIME.handle()
-⋮----
-fn platform_rust(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
-m.add_function(wrap_pyfunction!(initialize_rust_runtime, m)?)?;</file><file path="src/repomix-output.xml">This file is a merged representation of the entire codebase, combined into a single document by Repomix.
-&lt;file_summary&gt;
-This section contains a summary of this file.
-&lt;purpose&gt;
-This file contains a packed representation of the entire repository&apos;s contents.
-It is designed to be easily consumable by AI systems for analysis, code review,
-or other automated processes.
-&lt;/purpose&gt;
-&lt;file_format&gt;
-The content is organized as follows:
-1. This summary section
-2. Repository information
-3. Directory structure
-4. Repository files (if enabled)
-5. Multiple file entries, each consisting of:
-  - File path as an attribute
-  - Full contents of the file
-&lt;/file_format&gt;
-&lt;usage_guidelines&gt;
-- This file should be treated as read-only. Any changes should be made to the
-  original repository files, not this packed version.
-- When processing this file, use the file path to distinguish
-  between different files in the repository.
-- Be aware that this file may contain sensitive information. Handle it with
-  the same level of security as you would the original repository.
-&lt;/usage_guidelines&gt;
-&lt;notes&gt;
-- Some files may have been excluded based on .gitignore rules and Repomix&apos;s configuration
-- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Files matching patterns in .gitignore are excluded
-- Files matching default ignore patterns are excluded
-- Files are sorted by Git change count (files with more changes are at the bottom)
-&lt;/notes&gt;
-&lt;/file_summary&gt;
-&lt;directory_structure&gt;
-chain_monitor.rs
-execution.rs
-lib.rs
-market_data.rs
-transaction.rs
-cargo.toml
-&lt;/directory_structure&gt;
-&lt;files&gt;
-This section contains the contents of the repository&apos;s files.
-&lt;file path=&quot;chain_monitor.rs&quot;&gt;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use pyo3::exceptions::PyValueError;
-use ethers::types::Transaction;
-use rlp;
-#[pyfunction]
-fn decode_transaction(py: Python, tx_hex: &amp;str) -&gt; PyResult&lt;PyObject&gt; {
-    let bytes = hex::decode(tx_hex.trim_start_matches(&quot;0x&quot;))
-        .map_err(|e| PyValueError::new_err(format!(&quot;invalid hex: {e}&quot;)))?;
-    let tx: Transaction = rlp::decode(&amp;bytes)
-        .map_err(|e| PyValueError::new_err(format!(&quot;rlp decode failed: {e}&quot;)))?;
-    let out = PyDict::new(py);
-    out.set_item(&quot;from&quot;, format!(&quot;{:#x}&quot;, tx.from))?;
-    if let Some(to) = tx.to {
-        out.set_item(&quot;to&quot;, format!(&quot;{:#x}&quot;, to))?;
-    } else {
-        out.set_item(&quot;to&quot;, Option::&lt;String&gt;::None)?;
-    }
-    out.set_item(&quot;nonce&quot;, tx.nonce.as_u64())?;
-    // Use strings for big ints to avoid extra features
-    out.set_item(&quot;gas&quot;, tx.gas.to_string())?;
-    if let Some(p) = tx.gas_price { out.set_item(&quot;gas_price&quot;, p.to_string())?; }
-    else { out.set_item(&quot;gas_price&quot;, Option::&lt;String&gt;::None)?; }
-    out.set_item(&quot;value&quot;, tx.value.to_string())?;
-    out.set_item(&quot;input&quot;, format!(&quot;0x{}&quot;, hex::encode(tx.input)))?;
-    out.set_item(&quot;hash&quot;, format!(&quot;{:#x}&quot;, tx.hash))?;
-    Ok(out.into_any().unbind().into())
-}
-pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
-    m.add_function(wrap_pyfunction!(decode_transaction, m)?)?;
-    Ok(())
-}
-&lt;/file&gt;
-&lt;file path=&quot;execution.rs&quot;&gt;
-// execution.rs
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
-#[derive(Clone, Debug)]
-struct Token { address: String, symbol: String }
-#[derive(Clone, Debug)]
-struct Pool {
-    address: String,
-    token0: Token,
-    token1: Token,
-    fee: u32,
-    liquidity: u128,
-}
-struct Route { path: Vec&lt;String&gt;, output_amount: u128 }
-#[pyclass]
-pub struct ExecutionEngine {
-    #[pyo3(get)]
-    engine_id: String,
-    pools: Arc&lt;RwLock&lt;HashMap&lt;String, Pool&gt;&gt;&gt;, // address -&gt; Pool
-}
-#[pymethods]
-impl ExecutionEngine {
-    #[new]
-    fn new() -&gt; Self {
-        Self {
-            engine_id: uuid::Uuid::new_v4().to_string(),
-            pools: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-    #[pyo3(text_signature = &quot;($self, params)&quot;)]
-    fn optimize_route(&amp;self, py: Python, params: &amp;Bound&lt;&apos;_, PyDict&gt;) -&gt; PyResult&lt;PyObject&gt; {
-        // Parse inputs
-        let token_in: String = params.get_item(&quot;token_in&quot;)?
-            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing &apos;token_in&apos;&quot;))?
-            .extract()?;
-        let token_out: String = params.get_item(&quot;token_out&quot;)?
-            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing &apos;token_out&apos;&quot;))?
-            .extract()?;
-        let amount_in: u128 = params.get_item(&quot;amount_in&quot;)?
-            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing &apos;amount_in&apos;&quot;))?
-            .extract()?;
-        // Compute without the GIL
-        let pools_snapshot: Vec&lt;Pool&gt; = {
-            let guard = self.pools.read().map_err(|_| {
-                pyo3::exceptions::PyRuntimeError::new_err(&quot;pools lock poisoned&quot;)
-            })?;
-            guard.values().cloned().collect()
-        };
-        let route = py.allow_threads(|| {
-            // Dijkstra-like maximization. Use addresses, not symbols.
-            use std::cmp::Ordering;
-            use std::collections::{BinaryHeap, HashMap};
-            #[derive(Eq, PartialEq)]
-            struct Node { amt: u128, token: String }
-            impl Ord for Node {
-                fn cmp(&amp;self, other: &amp;Self) -&gt; Ordering { self.amt.cmp(&amp;other.amt) }
-            }
-            impl PartialOrd for Node {
-                fn partial_cmp(&amp;self, other: &amp;Self) -&gt; Option&lt;Ordering&gt; { Some(self.cmp(other)) }
-            }
-            let mut dist: HashMap&lt;String, u128&gt; = HashMap::new();
-            let mut prev: HashMap&lt;String, String&gt; = HashMap::new();
-            let mut pq: BinaryHeap&lt;Node&gt; = BinaryHeap::new();
-            dist.insert(token_in.clone(), amount_in);
-            pq.push(Node { amt: amount_in, token: token_in.clone() });
-            while let Some(Node { amt, token }) = pq.pop() {
-                if amt &lt; *dist.get(&amp;token).unwrap_or(&amp;0) { continue; }
-                for pool in &amp;pools_snapshot {
-                    // Determine direction by matching address or symbol if address missing
-                    let mut nexts = Vec::new();
-                    if pool.token0.address == token || pool.token0.symbol == token {
-                        let out = Self::calculate_amount_out(pool, amt);
-                        nexts.push((&amp;pool.token1, out));
-                    }
-                    if pool.token1.address == token || pool.token1.symbol == token {
-                        let out = Self::calculate_amount_out(pool, amt);
-                        nexts.push((&amp;pool.token0, out));
-                    }
-                    for (nt, out_amt) in nexts {
-                        if out_amt &gt; *dist.get(&amp;nt.address).unwrap_or(&amp;0) {
-                            dist.insert(nt.address.clone(), out_amt);
-                            prev.insert(nt.address.clone(), token.clone());
-                            pq.push(Node { amt: out_amt, token: nt.address.clone() });
-                        }
-                    }
-                }
-            }
-            // Reconstruct path by addresses
-            if !dist.contains_key(&amp;token_out) {
-                return None;
-            }
-            let mut path = Vec::new();
-            let mut cur = token_out.clone();
-            while let Some(p) = prev.get(&amp;cur) {
-                path.push(cur.clone());
-                cur = p.clone();
-            }
-            path.push(token_in.clone());
-            path.reverse();
-            Some(Route { path, output_amount: *dist.get(&amp;token_out).unwrap_or(&amp;0) })
-        });
-        match route {
-            Some(r) =&gt; {
-                let out = PyDict::new(py);
-                let path_list = PyList::new(py, &amp;r.path)?;
-                out.set_item(&quot;path&quot;, &amp;path_list)?;
-                out.set_item(&quot;output_amount&quot;, r.output_amount)?;
-                Ok(out.into_any().unbind().into())
-            }
-            None =&gt; Ok(py.None()),
-        }
-    }
-    #[pyo3(text_signature = &quot;($self, pools_data)&quot;)]
-    fn update_pools(&amp;self, _py: Python, pools_data: &amp;Bound&lt;&apos;_, PyList&gt;) -&gt; PyResult&lt;()&gt; {
-        let mut map = self.pools.write().map_err(|_| {
-            pyo3::exceptions::PyRuntimeError::new_err(&quot;pools lock poisoned&quot;)
-        })?;
-        map.clear();
-        for pool_any in pools_data.iter() {
-            let pool_dict: &amp;Bound&lt;PyDict&gt; = pool_any.downcast()?;
-            let token0_item = pool_dict.get_item(&quot;token0&quot;)?
-                .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token0&quot;))?;
-            let token0: &amp;Bound&lt;PyDict&gt; = token0_item.downcast()?;
-            let token1_item = pool_dict.get_item(&quot;token1&quot;)?
-                .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token1&quot;))?;
-            let token1: &amp;Bound&lt;PyDict&gt; = token1_item.downcast()?;
-            let pool = Pool {
-                address: pool_dict.get_item(&quot;address&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing address&quot;))?.extract()?,
-                token0: Token {
-                    address: token0.get_item(&quot;address&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token0.address&quot;))?.extract()?,
-                    symbol:  token0.get_item(&quot;symbol&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token0.symbol&quot;))?.extract()?,
-                },
-                token1: Token {
-                    address: token1.get_item(&quot;address&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token1.address&quot;))?.extract()?,
-                    symbol:  token1.get_item(&quot;symbol&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token1.symbol&quot;))?.extract()?,
-                },
-                fee: pool_dict.get_item(&quot;fee&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing fee&quot;))?.extract()?,
-                liquidity: pool_dict.get_item(&quot;liquidity&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing liquidity&quot;))?.extract()?,
-            };
-            map.insert(pool.address.clone(), pool);
-        }
-        Ok(())
-    }
-}
-// Pure Rust helper
-impl ExecutionEngine {
-    #[inline]
-    fn calculate_amount_out(pool: &amp;Pool, amount_in: u128) -&gt; u128 {
-        // Replace with correct AMM formula later
-        amount_in.saturating_sub((amount_in as u128 * pool.fee as u128) / 1_000_000u128)
-    }
-}
-pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
-    m.add_class::&lt;ExecutionEngine&gt;()?;
-    Ok(())
-}
-&lt;/file&gt;
-&lt;file path=&quot;lib.rs&quot;&gt;
-// lib.rs
-use once_cell::sync::{Lazy, OnceCell};
-use tokio::runtime::{Builder, Runtime};
-use pyo3::prelude::*;
-mod execution;
-mod chain_monitor;
-mod market_data;
-mod transaction;
-static GLOBAL_RUNTIME: Lazy&lt;Runtime&gt; = Lazy::new(|| {
-    Builder::new_multi_thread()
-        .enable_all()
-        .thread_name(&quot;platform-rt&quot;)
-        .max_blocking_threads(1024)
-        .build()
-        .expect(&quot;tokio runtime&quot;)
-});
-static TRACING_INIT: OnceCell&lt;()&gt; = OnceCell::new();
-#[pyfunction]
-pub fn initialize_rust_runtime() -&gt; PyResult&lt;()&gt; {
-    // Idempotent, no env-filter feature required
-    let _ = TRACING_INIT.get_or_init(|| {
-        let _ = tracing_subscriber::fmt::try_init();
-        ()
-    });
-    Lazy::force(&amp;GLOBAL_RUNTIME);
-    Ok(())
-}
-#[inline]
-pub fn runtime_handle() -&gt; &amp;&apos;static tokio::runtime::Handle {
-    GLOBAL_RUNTIME.handle()
-}
-#[pymodule]
-fn platform_rust(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
-    m.add_function(wrap_pyfunction!(initialize_rust_runtime, m)?)?;
-    execution::register(m)?;
-    chain_monitor::register(m)?;
-    market_data::register(m)?;
-    transaction::register(m)?;
-    Ok(())
-}
-&lt;/file&gt;
-&lt;file path=&quot;market_data.rs&quot;&gt;
-// market_data.rs
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
-use pyo3::exceptions::{PyTypeError, PyKeyError};
-#[pyfunction]
-pub fn aggregate_order_books(py: Python, books: &amp;Bound&lt;&apos;_, PyList&gt;) -&gt; PyResult&lt;PyObject&gt; {
-    let mut bids: Vec&lt;(i64, i64)&gt; = Vec::new();
-    let mut asks: Vec&lt;(i64, i64)&gt; = Vec::new();
-    for any in books.iter() {
-        let d: &amp;Bound&lt;PyDict&gt; = any.downcast()?;
-        let side: String = d.get_item(&quot;side&quot;)?
-            .ok_or_else(|| PyKeyError::new_err(&quot;missing &apos;side&apos;&quot;))?
-            .extract()?;
-        let price: i64 = d.get_item(&quot;price&quot;)?
-            .ok_or_else(|| PyKeyError::new_err(&quot;missing &apos;price&apos;&quot;))?
-            .extract()?;
-        let size: i64 = d.get_item(&quot;size&quot;)?
-            .ok_or_else(|| PyKeyError::new_err(&quot;missing &apos;size&apos;&quot;))?
-            .extract()?;
-        match side.as_str() {
-            &quot;bid&quot; =&gt; bids.push((price, size)),
-            &quot;ask&quot; =&gt; asks.push((price, size)),
-            _ =&gt; return Err(PyTypeError::new_err(&quot;side must be &apos;bid&apos; or &apos;ask&apos;&quot;)),
-        }
-    }
-    // simple aggregate by price
-    use std::collections::BTreeMap;
-    let mut bid_map = BTreeMap::new();
-    let mut ask_map = BTreeMap::new();
-    for (p, s) in bids { *bid_map.entry(p).or_insert(0) += s; }
-    for (p, s) in asks { *ask_map.entry(p).or_insert(0) += s; }
-    let out = PyDict::new(py);
-    let bids_vec: Vec&lt;(i64, i64)&gt; = bid_map.into_iter().collect();
-    let asks_vec: Vec&lt;(i64, i64)&gt; = ask_map.into_iter().collect();
-    let bids_list = PyList::new(py, &amp;bids_vec)?;
-    let asks_list = PyList::new(py, &amp;asks_vec)?;
-    out.set_item(&quot;bids&quot;, &amp;bids_list)?;
-    out.set_item(&quot;asks&quot;, &amp;asks_list)?;
-    Ok(out.into_any().unbind().into())
-}
-pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
-    m.add_function(wrap_pyfunction!(aggregate_order_books, m)?)?;
-    Ok(())
-}
-&lt;/file&gt;
-&lt;file path=&quot;transaction.rs&quot;&gt;
-// transaction.rs
-use pyo3::prelude::*;
-use pyo3::types::PyList;
-#[pyclass]
-pub struct TransactionBatcher { max_batch_size: usize }
-#[pymethods]
-impl TransactionBatcher {
-    #[new]
-    #[pyo3(signature = (max_batch_size=None))]
-    fn new(max_batch_size: Option&lt;usize&gt;) -&gt; Self {
-        Self { max_batch_size: max_batch_size.unwrap_or(100) }
-    }
-    fn batch_transactions(&amp;self, py: Python, transactions: Vec&lt;String&gt;) -&gt; PyResult&lt;PyObject&gt; {
-        let chunks: Vec&lt;Vec&lt;String&gt;&gt; = transactions
-            .chunks(self.max_batch_size)
-            .map(|c| c.to_vec())
-            .collect();
-        let py_list = PyList::new(py, chunks)?;
-        Ok(py_list.into_any().unbind().into())
-    }
-}
-pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
-    m.add_class::&lt;TransactionBatcher&gt;()?;
-    Ok(())
-}
-&lt;/file&gt;
-&lt;file path=&quot;cargo.toml&quot;&gt;
-[package]
-name = &quot;platform_rust&quot;
-version = &quot;0.1.0&quot;
-edition = &quot;2021&quot;
-[lib]
-name = &quot;platform_rust&quot;
-crate-type = [&quot;cdylib&quot;]
-[dependencies]
-pyo3 = { version = &quot;0.23.3&quot;, features = [&quot;extension-module&quot;, &quot;abi3-py39&quot;] }
-tokio = { version = &quot;1.42.0&quot;, features = [&quot;full&quot;] }
-# Use the unified ethers crate; remove redundant subcrates
-ethers = { version = &quot;2.0&quot; }
-rayon = &quot;1.10&quot;
-serde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }
-serde_json = &quot;1.0&quot;
-anyhow = &quot;1.0&quot;
-tracing = &quot;0.1&quot;
-tracing-subscriber = &quot;0.3&quot;
-uuid = { version = &quot;1.11&quot;, features = [&quot;v4&quot;] }
-# High-performance data structures
-dashmap = &quot;6.1&quot;
-crossbeam = &quot;0.8&quot;
-parking_lot = &quot;0.12&quot;
-# Web3 and crypto
-hex = &quot;0.4&quot;
-rlp = &quot;0.5&quot;
-sha3 = &quot;0.10&quot;
-once_cell = &quot;1.18&quot;
-# Async runtime
-futures = &quot;0.3&quot;
-async-trait = &quot;0.1&quot;
-[profile.release]
-lto = true
-opt-level = 3
-codegen-units = 1
-# Build Instructions:
-# For development: maturin develop
-# For release: maturin develop --release
-# Or use make commands: make build (release) or make build-debug
-&lt;/file&gt;
-&lt;/files&gt;</file><file path="platform_py/streaming/event_stream.py">logger = structlog.get_logger()
-⋮----
-@dataclass
-class StreamConfig
-⋮----
-stream_name: str = &quot;platform_events&quot;
-subjects: List[str] = field(default_factory=lambda: [
-durable_name: str = &quot;platform_worker&quot;
-retention_policy: str = &quot;workqueue&quot;
-max_age_seconds: int = 86400
-class EventStream
-⋮----
-def __init__(self, nats_config=config.nats, redis_config=config.redis, stream_config=StreamConfig())
-async def initialize(self) -&gt; None
-async def _setup_jetstream(self) -&gt; None
-⋮----
-stream = await self.jetstream.add_stream(
-⋮----
-async def shutdown(self) -&gt; None
-async def publish(self, subject: str, event: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -&gt; None
-⋮----
-dedup_id = event.get(&apos;id&apos;, str(UUID()))
-message_data = json.dumps(event).encode(&apos;utf-8&apos;)
-⋮----
-ack = await self.jetstream.publish(
-⋮----
-async def subscribe(self, subject: str, handler: Callable[[Dict[str, Any]], None], durable_name: Optional[str] = None) -&gt; None
-⋮----
-durable = durable_name or f&quot;{self.stream_config.durable_name}_{subject.replace(&apos;.*&apos;, &apos;_wildcard&apos;)}&quot;
-async def message_handler(msg)
-⋮----
-event_data = json.loads(msg.data.decode())
-⋮----
-async def publish_envelope(self, env: EventEnvelope, headers: Optional[Dict[str, str]] = None) -&gt; None
-⋮----
-data = env.model_dump()
-msg_id = env.eventId
-⋮----
-async def _buffer_in_redis(self, subject: str, event: Dict[str, Any]) -&gt; None
-⋮----
-stream_key = f&quot;events:{subject}&quot;
-pipeline = self.redis_client.pipeline()
-⋮----
-async def get_stream_state(self, stream_name: Optional[str] = None) -&gt; Optional[Dict[str, Any]]
-⋮----
-stream_info = await self.jetstream.stream_info(stream_name or self.stream_config.stream_name)
-⋮----
-async def replay_events_from_redis(self, subject: str, from_timestamp_ms: int, to_timestamp_ms: Optional[int] = None) -&gt; List[Dict[str, Any]]
-⋮----
-start = from_timestamp_ms
-end = to_timestamp_ms or &quot;+&quot;
-results = await self.redis_client.xrange(stream_key, start, end)
-⋮----
-async def _nats_error_cb(self, e)
-async def _nats_reconnected_cb(self)
-async def _nats_disconnected_cb(self)
-async def _nats_closed_cb(self)</file><file path="platform_py/app.py">logger = structlog.get_logger()
-⋮----
-@asynccontextmanager
-async def lifespan(app: FastAPI) -&gt; AsyncGenerator[None, None]
-def create_app() -&gt; FastAPI
-⋮----
-app = FastAPI(
-⋮----
-async def request_id_dispatch(request, call_next)
-⋮----
-req_id = request.headers.get(&quot;X-Request-ID&quot;) or str(uuid.uuid4())
-⋮----
-response = await call_next(request)
-⋮----
-@app.get(&quot;/health&quot;)
-    async def health_check()</file><file path="src/chain_monitor.rs">use pyo3::types::PyDict;
+services = ServiceConnector()</file><file path="src/chain_monitor.rs">use pyo3::types::PyDict;
 use pyo3::exceptions::PyValueError;
 use ethers::types::Transaction;
 use rlp;

@@ -13,7 +13,7 @@ import structlog
 from decimal import Decimal
 from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID, uuid4
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import polars as pl
 import numpy as np
@@ -207,7 +207,7 @@ class MomentumStrategy(BaseStrategy):
         
         # Data storage using Polars
         self._price_history: Dict[str, pl.DataFrame] = {}
-        self._last_rebalance = datetime.utcnow()
+        self._last_rebalance = datetime.now(timezone.utc)
         self.rebalance_frequency = timedelta(hours=self.config["rebalance_frequency_hours"])
         
         # Risk management
@@ -231,7 +231,7 @@ class MomentumStrategy(BaseStrategy):
                 "timestamp": [],
                 "price": [],
                 "volume": []
-            }, schema={"timestamp": pl.Datetime, "price": pl.Float64, "volume": pl.Float64})
+            }, schema={"timestamp": pl.Datetime(time_zone="UTC"), "price": pl.Float64, "volume": pl.Float64})
         
         logger.info("Price history initialized", assets=list(self._price_history.keys()))
     
@@ -247,7 +247,7 @@ class MomentumStrategy(BaseStrategy):
             await self._update_price_history(market_data)
             
             # Check if it's time to rebalance
-            should_rebalance = (datetime.utcnow() - self._last_rebalance) > self.rebalance_frequency
+            should_rebalance = (datetime.now(timezone.utc) - self._last_rebalance) > self.rebalance_frequency
             
             # Generate signals for each target asset
             for asset_config in self.config["target_assets"]:
@@ -262,7 +262,7 @@ class MomentumStrategy(BaseStrategy):
                     await self.track_intent_generated(intent)
             
             if should_rebalance and intents:
-                self._last_rebalance = datetime.utcnow()
+                self._last_rebalance = datetime.now(timezone.utc)
             
             self._signals_generated += len(intents)
             
@@ -293,7 +293,7 @@ class MomentumStrategy(BaseStrategy):
             volatility=features.get("vol_10d"),
             volume_ratio=features.get("volume_ratio"),
             market_impact=features.get("price_momentum"),
-            time_of_day=datetime.utcnow().hour,
+            time_of_day=datetime.now(timezone.utc).hour,
             custom_features=features
         )
         
@@ -416,7 +416,7 @@ class MomentumStrategy(BaseStrategy):
     
     async def _update_price_history(self, market_data: Dict[str, Any]) -> None:
         """Update price history with new market data."""
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc)
         
         for asset_symbol in self._price_history.keys():
             if asset_symbol in market_data:
@@ -613,7 +613,7 @@ class MomentumStrategy(BaseStrategy):
                 "type": intent.type.value,
                 "price": price,
                 "return": trade_return,
-                "timestamp": datetime.utcnow()
+                "timestamp": datetime.now(timezone.utc)
             }
         
         return {
@@ -622,5 +622,5 @@ class MomentumStrategy(BaseStrategy):
             "type": intent.type.value,
             "return": 0.0,
             "error": "No market data",
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }

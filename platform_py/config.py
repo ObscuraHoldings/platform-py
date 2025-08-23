@@ -118,7 +118,6 @@ class PlatformConfig(PydanticBaseSettings):
     ray: RayConfig = Field(default_factory=RayConfig)
     ml: MLConfig = Field(default_factory=MLConfig)
     network: NetworkConfig = Field(default_factory=NetworkConfig)
-    # RPC URLs per chain id (e.g., {1: "https://mainnet.infura.io/v3/..."})
     rpc_urls: Dict[int, str] = Field(default_factory=dict)
     
     @field_validator("rpc_urls", mode="before")

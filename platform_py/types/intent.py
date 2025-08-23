@@ -8,7 +8,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional, List, Dict, Any, Union
 from uuid import UUID, uuid4
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
@@ -156,7 +156,7 @@ class Intent(BaseModel):
     parent_intent_id: Optional[UUID] = Field(None, description="Parent intent if this is a sub-intent")
     
     # Timing
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Intent creation timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Intent creation timestamp")
     expires_at: Optional[datetime] = Field(None, description="Intent expiration time")
     
     # Core intent data
@@ -188,7 +188,7 @@ class Intent(BaseModel):
     def validate_expiration(self) -> 'Intent':
         """Validate expiration is in the future."""
         if self.expires_at is not None:
-            ts = self.timestamp or datetime.utcnow()
+            ts = self.timestamp or datetime.now(timezone.utc)
             if self.expires_at <= ts:
                 raise ValueError("Expiration time must be in the future")
         return self
@@ -205,14 +205,14 @@ class Intent(BaseModel):
         """Check if intent has expired."""
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
     
     @property
     def time_remaining(self) -> Optional[timedelta]:
         """Get time remaining until expiration."""
         if self.expires_at is None:
             return None
-        remaining = self.expires_at - datetime.utcnow()
+        remaining = self.expires_at - datetime.now(timezone.utc)
         return remaining if remaining.total_seconds() > 0 else timedelta(0)
     
     @property
@@ -259,7 +259,7 @@ class IntentReceipt(BaseModel):
     """Receipt returned when submitting an intent."""
     
     intent_id: UUID = Field(..., description="Intent ID")
-    received: datetime = Field(default_factory=datetime.utcnow, description="Receipt timestamp")
+    received: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Receipt timestamp")
     status: IntentStatus = Field(default=IntentStatus.PENDING, description="Initial status")
     estimated_execution_time: Optional[timedelta] = Field(None, description="Estimated execution time")
     warnings: Optional[List[str]] = Field(None, description="Validation warnings")
@@ -270,7 +270,7 @@ class IntentUpdate(BaseModel):
     """Intent status update notification."""
     
     intent_id: UUID = Field(..., description="Intent ID")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Update timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Update timestamp")
     old_status: IntentStatus = Field(..., description="Previous status")
     new_status: IntentStatus = Field(..., description="New status")
     reason: Optional[str] = Field(None, description="Reason for status change")

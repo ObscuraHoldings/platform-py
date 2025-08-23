@@ -52,8 +52,8 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.7"]
+build-backend = "maturin"
 
 [tool.hatch.build.targets.wheel]
 packages = ["platform_py"]

@@ -35,11 +35,11 @@ pub fn aggregate_order_books(py: Python, books: &Bound<'_, PyList>) -> PyResult<
     let out = PyDict::new(py);
     let bids_vec: Vec<(i64, i64)> = bid_map.into_iter().collect();
     let asks_vec: Vec<(i64, i64)> = ask_map.into_iter().collect();
-    let bids_list = PyList::new(py, &bids_vec);
-    let asks_list = PyList::new(py, &asks_vec);
-    out.set_item("bids", &bids_list)?;
-    out.set_item("asks", &asks_list)?;
-    Ok(out.into_py(py))
+    let bids_list = PyList::new(py, &bids_vec)?;
+    let asks_list = PyList::new(py, &asks_vec)?;
+    out.set_item("bids", bids_list)?;
+    out.set_item("asks", asks_list)?;
+    Ok(out.unbind().into_any())
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
