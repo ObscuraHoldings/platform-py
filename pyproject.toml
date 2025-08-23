@@ -1,5 +1,5 @@
 [project]
-name = "platform-py"
+name = "platform_py"
 version = "0.1.0"
 description = "Hybrid Python-Rust Strategy Execution Platform"
 readme = "README.md"
@@ -54,6 +54,11 @@ dependencies = [
 [build-system]
 requires = ["maturin>=1.7"]
 build-backend = "maturin"
+
+[tool.maturin]
+# Ensure the pure-Python package `platform_py/` is included alongside the Rust extension
+python-source = "."
+python-packages = ["platform_py"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["platform_py"]
