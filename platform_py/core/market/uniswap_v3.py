@@ -35,8 +35,8 @@ class UniswapV3Adapter(VenueAdapter):
     async def get_name(self) -> str:
         return "Uniswap V3"
 
-    async def get_supported_chains(self) -> List[int]:
-        return [Chain.ETHEREUM.value, Chain.ARBITRUM.value, Chain.BASE.value]
+    def get_supported_chains(self) -> List[Chain]:
+        return [Chain.ETHEREUM, Chain.ARBITRUM, Chain.BASE]
 
     async def get_trading_pairs(self, chain_id: int) -> List[TradingPair]:
         # In a real implementation, this would be fetched from the Uniswap subgraph or a database

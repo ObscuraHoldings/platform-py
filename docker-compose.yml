@@ -52,7 +52,7 @@ services:
 
   # Ray head node for distributed computing
   ray-head:
-    image: rayproject/ray:latest
+    image: rayproject/ray:2.48.0-py312
     container_name: platform_ray_head
     ports:
       - "8265:8265" # Ray Dashboard
@@ -60,7 +60,8 @@ services:
       - "6380:6379" # Ray Redis port (different from main Redis)
     environment:
       RAY_SCHEDULER_EVENTS: "1"
-    command: ray start --head --dashboard-host=0.0.0.0 --ray-client-server-port=10001
+    command: ray start --head --dashboard-host=0.0.0.0 --ray-client-server-port=10001 --block
+    shm_size: 2g
     healthcheck:
       test: ["CMD", "ray", "status"]
       interval: 30s

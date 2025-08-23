@@ -10,10 +10,13 @@ from uuid import UUID
 
 import nats
 from nats.js import JetStreamContext
+from nats.js.api import ConsumerConfig
 from nats.errors import TimeoutError as NatsTimeoutError, NoServersError
+from nats.js.errors import BadRequestError
 import redis.asyncio as redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from dataclasses import dataclass, field
+ 
 
 from ..config import config
 from ..types import Event
@@ -172,14 +175,45 @@ class EventStream:
                 logger.error("Error processing event", subject=msg.subject, error=str(e))
                 await msg.nak(delay=5) # Retry after 5 seconds
 
-        await self.jetstream.subscribe(
-            subject,
-            durable=durable,
-            cb=message_handler,
-            manual_ack=True,
-            ack_wait=30 # 30 seconds to process
-        )
-        logger.info("Subscribed to subject", subject=subject, durable_name=durable)
+        try:
+            await self.jetstream.subscribe(
+                subject,
+                durable=durable,
+                cb=message_handler,
+                manual_ack=True,
+                config=ConsumerConfig(
+                    ack_wait=30.0 # seconds
+                )
+            )
+            logger.info("Subscribed to subject", subject=subject, durable_name=durable)
+        except BadRequestError as e:
+            # Handle conflicting consumer config by deleting and retrying once
+            try:
+                await self.jetstream.delete_consumer(self.stream_config.stream_name, durable)
+                logger.warning("Deleted conflicting consumer; retrying subscribe", subject=subject, durable_name=durable)
+                await self.jetstream.subscribe(
+                    subject,
+                    durable=durable,
+                    cb=message_handler,
+                    manual_ack=True,
+                    config=ConsumerConfig(ack_wait=30.0)
+                )
+                logger.info("Subscribed to subject after recreation", subject=subject, durable_name=durable)
+            except Exception as e2:
+                logger.warning(
+                    "JetStream subscribe failed after consumer recreation; continuing without subscription",
+                    subject=subject,
+                    durable_name=durable,
+                    error=str(e2),
+                )
+        except Exception as e:
+            # Do not fail app startup if NATS subscription cannot be established.
+            logger.warning(
+                "JetStream subscribe failed; continuing without subscription",
+                subject=subject,
+                durable_name=durable,
+                error=str(e),
+            )
 
     async def publish_envelope(self, env: EventEnvelope, headers: Optional[Dict[str, str]] = None) -> None:
         """Publish a typed EventEnvelope.

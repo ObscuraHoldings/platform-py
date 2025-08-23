@@ -3,6 +3,7 @@ Service connections management for external services like database, cache, etc.
 """
 
 import structlog
+from pathlib import Path
 import asyncpg
 import redis.asyncio as redis
 import ray
@@ -73,11 +74,30 @@ class ServiceConnector:
         try:
             if not ray.is_initialized():
                 # Always use configured Ray Client address; do not start local raylet
-                ray.init(address=config.ray.address)
+                project_root = str(Path(__file__).resolve().parents[1])
+                ray.init(
+                    address=config.ray.address,
+                    runtime_env={
+                        # Ship local code to the Ray cluster so remote actors can import platform_py
+                        "working_dir": project_root,
+                        # Minimal third-party deps required by remote actors/types
+                        "pip": [
+                            "structlog",
+                            "pydantic>=2",
+                            "pydantic-settings>=2",
+                            "nats-py>=2",
+                            "redis>=5",
+                            "asyncpg>=0.29",
+                            "eth-hash[pycryptodome]",
+                            "eth-utils>=5.3.0",
+                        ],
+                    },
+                )
             logger.info("Ray connected", address=config.ray.address)
         except Exception as e:
             # Non-fatal for API bring-up; warn and proceed without Ray
             logger.warning("Ray unavailable; proceeding without distributed features", error=str(e))
+
 
     async def disconnect_all(self) -> None:
         """Disconnect from all external services."""
@@ -98,6 +118,7 @@ class ServiceConnector:
         if ray.is_initialized():
             ray.shutdown()
             logger.info("Ray shut down")
+
 
 
 # Global service connector instance

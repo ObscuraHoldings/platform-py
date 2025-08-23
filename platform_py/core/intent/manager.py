@@ -31,13 +31,15 @@ class IntentManager:
                  event_stream: EventStream,
                  ml_prioritizer: Optional[MLPrioritizer] = None,
                  risk_engine: Optional["RiskEngine"] = None,
-                 enable_legacy_queue: bool = False):
+                 enable_legacy_queue: bool = False,
+                 pipeline: Optional[DistributedIntentPipeline] = None):
         
         self.db_pool = db_pool
         self.event_stream = event_stream
         self.validator = IntentValidator(db_pool)
         self.ml_prioritizer = ml_prioritizer
-        self.pipeline = DistributedIntentPipeline()
+        # Pipeline is optional; when None, distributed features are disabled
+        self.pipeline: Optional[DistributedIntentPipeline] = pipeline
         self.risk_engine = risk_engine
         self._enable_legacy_queue = enable_legacy_queue
         self._seq_by_corr: Dict[str, int] = {}
@@ -51,7 +53,7 @@ class IntentManager:
     async def initialize(self) -> None:
         """Initialize IntentManager and start processing loop."""
         self._running = True
-        await self.pipeline.initialize_processors()
+        # Do not initialize pipeline here; it's managed externally by dependencies
         if self._enable_legacy_queue:
             self._processing_task = asyncio.create_task(self._process_intent_queue())
             logger.info("IntentManager processing started (legacy queue enabled)")
@@ -67,7 +69,8 @@ class IntentManager:
                 await self._processing_task
             except asyncio.CancelledError:
                 pass
-        await self.pipeline.shutdown()
+        if self.pipeline:
+            await self.pipeline.shutdown()
         logger.info("IntentManager shut down")
     
     async def submit_intent(self, intent: Intent, metadata: EventMetadata) -> IntentReceipt:
@@ -177,8 +180,12 @@ class IntentManager:
                 )
                 await self.event_stream.publish_envelope(status_env)
                 
-                # Hand off to distributed execution pipeline
-                sub_intents = await self.pipeline.process_intents([intent])
+                # Hand off to distributed execution pipeline if available
+                if not self.pipeline:
+                    logger.warning("Distributed pipeline unavailable; skipping intent decomposition")
+                    sub_intents = [intent]
+                else:
+                    sub_intents = await self.pipeline.process_intents([intent])
                 
                 logger.info("Intent processed by pipeline", 
                             intent_id=str(intent.id), 

@@ -19,7 +19,6 @@ from .state import StateCoordinator
 
 logger = structlog.get_logger()
 
-
 class CoreComponents:
     """Container for core platform components."""
     

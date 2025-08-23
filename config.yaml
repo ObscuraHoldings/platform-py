@@ -14,8 +14,8 @@ database:
     password: "platform_secure_pass"
     pool_size: 20
     max_overflow: 10
-    
-# Cache Configuration  
+
+# Cache Configuration
 cache:
   redis:
     host: "localhost"
@@ -23,7 +23,7 @@ cache:
     db: 0
     max_connections: 50
     decode_responses: true
-    
+
 # Message Queue Configuration
 messaging:
   nats:
@@ -31,7 +31,7 @@ messaging:
       - "nats://localhost:4222"
     max_reconnect_attempts: 10
     reconnect_time_wait: 2
-    
+
 # Distributed Computing Configuration
 distributed:
   ray:
@@ -39,7 +39,7 @@ distributed:
     dashboard_url: "http://localhost:8265"
     num_cpus: 4
     num_gpus: 0
-    object_store_memory: 2147483648  # 2GB
+    object_store_memory: 2147483648 # 2GB
 
 # Blockchain Configuration
 blockchain:
@@ -62,7 +62,7 @@ blockchain:
       rpc_url: "https://mainnet.base.org"
       chain_id: 8453
       block_confirmations: 1
-      
+
 # Safe Configuration
 safe:
   address: "0x0000000000000000000000000000000000000000"
@@ -70,7 +70,7 @@ safe:
   owners:
     - "0x0000000000000000000000000000000000000001"
     - "0x0000000000000000000000000000000000000002"
-    
+
 # API Configuration
 api:
   host: "0.0.0.0"
@@ -80,7 +80,7 @@ api:
     - "http://localhost:8080"
   rate_limit:
     requests_per_minute: 100
-    
+
 # Monitoring Configuration
 monitoring:
   prometheus:
@@ -90,14 +90,14 @@ monitoring:
     level: "INFO"
     format: "json"
     output: "stdout"
-    
+
 # Risk Configuration
 risk:
   max_position_size: 100000
   max_daily_loss: 10000
   max_correlation: 0.8
   circuit_breaker_threshold: 0.15
-  
+
 # Execution Configuration
 execution:
   max_concurrent_intents: 10
