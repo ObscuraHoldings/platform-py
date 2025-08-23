@@ -16,7 +16,7 @@ or other automated processes.</purpose><file_format>The content is organized as 
   the same level of security as you would the original repository.
 - Pay special attention to the Repository Description. These contain important context and guidelines specific to this project.</usage_guidelines><notes>- Some files may have been excluded based on .gitignore rules and Repomix&apos;s configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Only files matching these patterns are included: src/**/*, Platform/**/*
+- Only files matching these patterns are included: src/**/*, platform_py/**/*
 - Files matching these patterns are excluded: **/*.log, additional-folder, **/*.pyc, **/*.pyo, **/*.pyd, **/*.pyw, **/*.pyz, **/*.pywz, .docs/**/*
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
@@ -24,7 +24,7 @@ or other automated processes.</purpose><file_format>The content is organized as 
 - Empty lines have been removed from all files
 - Content has been formatted for parsing in xml style
 - Content has been compressed - code blocks are separated by ⋮---- delimiter
-- Files are sorted by Git change count (files with more changes are at the bottom)</notes></file_summary><user_provided_header>Strategy Execution Platform: Consolidated repository output for LLM analysis.</user_provided_header><directory_structure>Platform/
+- Files are sorted by Git change count (files with more changes are at the bottom)</notes></file_summary><user_provided_header>Strategy Execution Platform: Consolidated repository output for LLM analysis.</user_provided_header><directory_structure>platform_py/
   agent/
     __init__.py
     coordination.py
@@ -33,12 +33,14 @@ or other automated processes.</purpose><file_format>The content is organized as 
     __init__.py
     intent.py
     strategy.py
+    stream.py
   chain_monitor/
     __init__.py
     watcher.py
   core/
     execution/
       __init__.py
+      orchestrator.py
       planner.py
       venue_manager.py
     intent/
@@ -86,6 +88,7 @@ or other automated processes.</purpose><file_format>The content is organized as 
   types/
     __init__.py
     common.py
+    envelope.py
     events.py
     intent.py
     rust_bridge.py
@@ -95,20 +98,22 @@ or other automated processes.</purpose><file_format>The content is organized as 
   dependencies.py
   rust_bindings.py
   services.py
+  setup_event_loop.py
 src/
   chain_monitor.rs
   execution.rs
   lib.rs
   market_data.rs
-  transaction.rs</directory_structure><files>This section contains the contents of the repository&apos;s files.<file path="Platform/agent/__init__.py">__all__ = [&quot;AgentFramework&quot;, &quot;CoordinationService&quot;]</file><file path="Platform/agent/coordination.py">class CoordinationService
+  repomix-output.xml
+  transaction.rs</directory_structure><files>This section contains the contents of the repository&apos;s files.<file path="platform_py/agent/__init__.py">__all__ = [&quot;AgentFramework&quot;, &quot;CoordinationService&quot;]</file><file path="platform_py/agent/coordination.py">class CoordinationService
 ⋮----
 def __init__(self)
 async def acquire_lock(self, lock_name: str) -&gt; bool
-async def release_lock(self, lock_name: str)</file><file path="Platform/agent/framework.py">class AgentFramework
+async def release_lock(self, lock_name: str)</file><file path="platform_py/agent/framework.py">class AgentFramework
 ⋮----
 def __init__(self)
 async def authenticate_agent(self, agent_id: str, credentials: Dict[str, Any]) -&gt; bool
-async def authorize_action(self, agent_id: str, action: str, resource: str) -&gt; bool</file><file path="Platform/api/__init__.py">api_router = APIRouter()</file><file path="Platform/api/intent.py">router = APIRouter(
+async def authorize_action(self, agent_id: str, action: str, resource: str) -&gt; bool</file><file path="platform_py/api/__init__.py">api_router = APIRouter()</file><file path="platform_py/api/intent.py">router = APIRouter(
 logger = structlog.get_logger()
 ⋮----
 @router.post(&quot;/submit&quot;, response_model=IntentReceipt)
@@ -129,7 +134,7 @@ status = await components.intent_manager.get_intent_status(intent_id)
 @router.get(&quot;/{intent_id}/history&quot;)
 async def get_intent_history(intent_id: UUID)
 ⋮----
-history = await components.intent_manager.get_intent_history(intent_id)</file><file path="Platform/api/strategy.py">class StrategyManager
+history = await components.intent_manager.get_intent_history(intent_id)</file><file path="platform_py/api/strategy.py">class StrategyManager
 ⋮----
 def __init__(self)
 def get_all_strategies(self) -&gt; List[Dict[str, Any]]
@@ -150,11 +155,33 @@ strategy = await strategy_manager.get_strategy(strategy_id)
 async def pause_strategy(strategy_id: UUID)
 ⋮----
 @router.post(&quot;/{strategy_id}/resume&quot;)
-async def resume_strategy(strategy_id: UUID)</file><file path="Platform/chain_monitor/__init__.py">__all__ = [&quot;ChainWatcher&quot;]</file><file path="Platform/chain_monitor/watcher.py">logger = structlog.get_logger()
+async def resume_strategy(strategy_id: UUID)</file><file path="platform_py/api/stream.py">router = APIRouter(prefix=&quot;/stream&quot;, tags=[&quot;Stream&quot;])
+⋮----
+@router.websocket(&quot;&quot;)
+async def stream(ws: WebSocket)
+⋮----
+queue: asyncio.Queue = asyncio.Queue(maxsize=1024)
+async def make_handler()
+⋮----
+async def handler(evt: dict)
+⋮----
+data = json.dumps(evt)
+⋮----
+subs = []
+⋮----
+sub_msg = await ws.receive_text()
+req = json.loads(sub_msg)
+topics: List[str] = req.get(&quot;topics&quot;, [&quot;intent.*&quot;, &quot;plan.*&quot;, &quot;exec.*&quot;])
+handler = await make_handler()
+⋮----
+data = await queue.get()</file><file path="platform_py/chain_monitor/__init__.py">__all__ = [&quot;ChainWatcher&quot;]</file><file path="platform_py/chain_monitor/watcher.py">logger = structlog.get_logger()
 class ChainWatcher
 ⋮----
 def __init__(self, chain_id: int, event_stream: EventStream)
 def _get_rpc_url(self) -&gt; str
+⋮----
+url = config.get_rpc_url(self.chain_id)
+⋮----
 async def start(self)
 async def stop(self)
 async def _poll_for_events(self)
@@ -178,13 +205,65 @@ def _try_get_raw_tx_hex(self, tx: Any) -&gt; Optional[str]
 ⋮----
 tx_hash = tx.hash if hasattr(tx, &quot;hash&quot;) else tx.get(&quot;hash&quot;)
 ⋮----
-raw = self.w3.eth.get_raw_transaction(tx_hash)</file><file path="Platform/core/execution/__init__.py">__all__ = [&quot;ExecutionPlanner&quot;, &quot;ExecutionPlan&quot;, &quot;VenueManager&quot;]</file><file path="Platform/core/execution/planner.py">logger = structlog.get_logger()
+raw = self.w3.eth.get_raw_transaction(tx_hash)</file><file path="platform_py/core/execution/__init__.py">__all__ = [&quot;ExecutionPlanner&quot;, &quot;ExecutionPlan&quot;, &quot;VenueManager&quot;]</file><file path="platform_py/core/execution/orchestrator.py">logger = structlog.get_logger()
+class ExecutionOrchestrator
+⋮----
+def __init__(self, venue_manager: VenueManager, event_stream: EventStream)
+async def start(self) -&gt; None
+⋮----
+async def on_plan_created(evt: Dict[str, Any])
+⋮----
+payload = evt.get(&quot;payload&quot;, {})
+plan_id = payload.get(&quot;planId&quot;)
+intent_id = payload.get(&quot;intentId&quot;)
+steps = payload.get(&quot;steps&quot;, [])
+corr = evt.get(&quot;correlationId&quot;, f&quot;intent:{intent_id}&quot;)
+cause = evt.get(&quot;eventId&quot;)
+⋮----
+started = envelope(
+⋮----
+last_txh: Optional[str] = None
+amount_out: Optional[str] = None
+⋮----
+venue_name = step.get(&quot;venue&quot;)
+adapter = await self._get_adapter(venue_name)
+order = {
+sub_res = await adapter.submit_order(order)
+txh = sub_res.get(&quot;order_id&quot;)
+last_txh = txh
+step_sub = envelope(
+⋮----
+status = await adapter.get_order_status(txh)
+amount_out = status.get(&quot;amount_out&quot;) or step.get(&quot;min_out&quot;)
+step_fill = envelope(
+⋮----
+completed = envelope(
+⋮----
+failed = envelope(
+⋮----
+async def _get_adapter(self, venue_name: str)
+⋮----
+venue = Venue(venue_name)
+⋮----
+adapter = self.venue_manager.adapters.get(venue)</file><file path="platform_py/core/execution/planner.py">logger = structlog.get_logger()
 class ExecutionPlan
 ⋮----
 def __init__(self, intent_id: UUID)
 class ExecutionPlanner
 ⋮----
-def __init__(self, venue_manager: VenueManager, ml_cost_model: Optional[Any] = None)
+def __init__(self, venue_manager: VenueManager, event_stream: Optional[EventStream] = None, ml_cost_model: Optional[Any] = None)
+async def start(self) -&gt; None
+⋮----
+async def on_intent_accepted(evt: Dict[str, Any])
+⋮----
+payload = evt.get(&quot;payload&quot;, {})
+intent_id = payload.get(&quot;intentId&quot;)
+⋮----
+plan_id = self._ulid()
+step = await self._build_single_step(payload)
+⋮----
+env = envelope(
+⋮----
 async def create_plan(self, intent: Intent) -&gt; ExecutionPlan
 ⋮----
 plan = ExecutionPlan(intent.id)
@@ -220,7 +299,21 @@ venue = Venue(step[&apos;venue&apos;])
 pair = TradingPair(base=intent.primary_asset, quote=quote_asset, venue=venue)
 liquidity = await self.venue_manager.get_liquidity_for_pair(pair)
 ⋮----
-route = await asyncio.to_thread(optimize_route, params)</file><file path="Platform/core/execution/venue_manager.py">class VenueManager
+route = await asyncio.to_thread(optimize_route, params)
+⋮----
+async def _build_single_step(self, accepted_payload: Dict[str, Any]) -&gt; Dict[str, Any]
+⋮----
+intent = accepted_payload.get(&quot;intent&quot;) or {}
+assets = intent.get(&quot;assets&quot;, [])
+⋮----
+base = assets[0].get(&quot;asset&quot;) or assets[0]
+quote = assets[1].get(&quot;asset&quot;) or assets[1]
+amount_in = assets[1].get(&quot;amount&quot;) or 0
+constraints = intent.get(&quot;constraints&quot;, {})
+max_slippage = float(constraints.get(&quot;max_slippage&quot;, 0.01))
+min_out = float(amount_in) * (1 - max_slippage)
+⋮----
+def _ulid(self) -&gt; str</file><file path="platform_py/core/execution/venue_manager.py">class VenueManager
 ⋮----
 def __init__(self)
 async def initialize(self)
@@ -232,7 +325,7 @@ eth_pairs = await uniswap_v3.get_trading_pairs(1)
 weth_usdc_pair = eth_pairs[0]
 ⋮----
 async def get_liquidity_for_pair(self, pair: TradingPair) -&gt; Optional[Dict[str, Any]]
-async def update_liquidity(self, pair: TradingPair, liquidity_data: Dict[str, Any])</file><file path="Platform/core/intent/__init__.py">__all__ = [</file><file path="Platform/core/intent/manager.py">logger = structlog.get_logger()
+async def update_liquidity(self, pair: TradingPair, liquidity_data: Dict[str, Any])</file><file path="platform_py/core/intent/__init__.py">__all__ = [</file><file path="platform_py/core/intent/manager.py">logger = structlog.get_logger()
 class IntentManager
 ⋮----
 async def initialize(self) -&gt; None
@@ -241,20 +334,28 @@ async def submit_intent(self, intent: Intent, metadata: EventMetadata) -&gt; Int
 ⋮----
 ml_priority = await self.ml_prioritizer.calculate_priority(intent)
 ⋮----
-event = create_intent_submitted_event(intent, metadata)
+env = self._mk_env(
+⋮----
+decision = await self.risk_engine.evaluate_risk(intent)
+⋮----
+ra = self._mk_env(
+⋮----
+ia = self._mk_env(
+⋮----
+rr = self._mk_env(
 ⋮----
 async def _process_intent_queue(self) -&gt; None
 ⋮----
 current_version = await self._get_aggregate_version(intent.id)
 ⋮----
-metadata = EventMetadata(source_service=&quot;IntentManager&quot;, source_version=&quot;1.0.0&quot;)
-status_event = create_intent_status_changed_event(
+status_env = self._mk_env(
 ⋮----
 sub_intents = await self.pipeline.process_intents([intent])
 ⋮----
 async def _store_event(self, event: Event) -&gt; None
+def _mk_env(self, *, topic: str, correlation_id: str, payload: Dict[str, Any], causation_id: Optional[str] = None)
 ⋮----
-query = &quot;&quot;&quot;
+seq = self._seq_by_corr.get(correlation_id, 0) + 1
 ⋮----
 async def _get_aggregate_version(self, aggregate_id: UUID) -&gt; int
 ⋮----
@@ -263,6 +364,8 @@ query = &quot;SELECT MAX(aggregate_version) FROM events WHERE aggregate_id = $1&
 version = await conn.fetchval(query, aggregate_id)
 ⋮----
 async def get_intent_status(self, intent_id: UUID) -&gt; Optional[Dict[str, Any]]
+⋮----
+query = &quot;&quot;&quot;
 ⋮----
 row = await conn.fetchrow(query, intent_id)
 ⋮----
@@ -279,7 +382,7 @@ class GenericPayload(EventPayload)
 def get_event_type(self) -&gt; str: return row[&apos;event_type&apos;]
 event = Event(
 ⋮----
-def get_queue_size(self) -&gt; int</file><file path="Platform/core/intent/prioritizer.py">logger = structlog.get_logger()
+def get_queue_size(self) -&gt; int</file><file path="platform_py/core/intent/prioritizer.py">logger = structlog.get_logger()
 class MLPrioritizer
 ⋮----
 def __init__(self, model_path: str, gpu_enabled: bool = False)
@@ -297,7 +400,7 @@ priority = int(priority_score * 10)
 ⋮----
 def _prepare_features(self, features: Dict[str, Any]) -&gt; Any
 ⋮----
-feature_vector = list(features.values())</file><file path="Platform/core/intent/processor.py">logger = structlog.get_logger()
+feature_vector = list(features.values())</file><file path="platform_py/core/intent/processor.py">logger = structlog.get_logger()
 ⋮----
 @ray.remote(num_cpus=config.ray.num_cpus, num_gpus=config.ray.num_gpus)
 class IntentProcessor
@@ -360,7 +463,7 @@ results = await asyncio.gather(*futures)
 all_sub_intents = [sub_intent for sub_intent_list in results for sub_intent in sub_intent_list]
 ⋮----
 async def shutdown(self) -&gt; None
-def get_cluster_status(self) -&gt; Dict[str, Any]</file><file path="Platform/core/intent/validator.py">logger = structlog.get_logger()
+def get_cluster_status(self) -&gt; Dict[str, Any]</file><file path="platform_py/core/intent/validator.py">logger = structlog.get_logger()
 class IntentValidator
 ⋮----
 def __init__(self, db_pool: asyncpg.Pool)
@@ -381,7 +484,7 @@ chain_id = intent.primary_asset.chain_id
 supported_venues = self.supported_venues_by_chain.get(chain_id, [])
 ⋮----
 def _validate_gas_costs(self, intent: Intent) -&gt; Tuple[List[str], List[str]]
-async def _validate_against_portfolio(self, intent: Intent) -&gt; Tuple[List[str], List[str]]</file><file path="Platform/core/market/__init__.py">__all__ = [&quot;VenueAdapter&quot;, &quot;UniswapV3Adapter&quot;]</file><file path="Platform/core/market/adapter.py">class VenueAdapter(ABC)
+async def _validate_against_portfolio(self, intent: Intent) -&gt; Tuple[List[str], List[str]]</file><file path="platform_py/core/market/__init__.py">__all__ = [&quot;VenueAdapter&quot;, &quot;UniswapV3Adapter&quot;]</file><file path="platform_py/core/market/adapter.py">class VenueAdapter(ABC)
 ⋮----
 @abstractmethod
     async def get_name(self) -&gt; str
@@ -402,7 +505,7 @@ async def _validate_against_portfolio(self, intent: Intent) -&gt; Tuple[List[str
     async def submit_order(self, order: Dict[str, Any]) -&gt; Dict[str, Any]
 ⋮----
 @abstractmethod
-    async def get_order_status(self, order_id: str) -&gt; Dict[str, Any]</file><file path="Platform/core/market/uniswap_v3.py">class MockWeb3Provider
+    async def get_order_status(self, order_id: str) -&gt; Dict[str, Any]</file><file path="platform_py/core/market/uniswap_v3.py">class MockWeb3Provider
 ⋮----
 SQRT_PRICE_X96 = 4295128739 * (2**96)
 async def get_pool_data(self, pool_address: str) -&gt; Dict[str, Any]
@@ -426,14 +529,14 @@ async def get_order_book(self, pair: TradingPair, depth: int = 20) -&gt; OrderBo
 price = await self.get_price(pair)
 ⋮----
 async def submit_order(self, order: Dict[str, Any]) -&gt; Dict[str, Any]
-async def get_order_status(self, order_id: str) -&gt; Dict[str, Any]</file><file path="Platform/core/__init__.py">__all__ = []</file><file path="Platform/governance/__init__.py">__all__ = [&quot;GovernanceGateway&quot;, &quot;PolicyEngine&quot;]</file><file path="Platform/governance/gateway.py">class GovernanceGateway
+async def get_order_status(self, order_id: str) -&gt; Dict[str, Any]</file><file path="platform_py/core/__init__.py">__all__ = []</file><file path="platform_py/governance/__init__.py">__all__ = [&quot;GovernanceGateway&quot;, &quot;PolicyEngine&quot;]</file><file path="platform_py/governance/gateway.py">class GovernanceGateway
 ⋮----
 def __init__(self)
 async def create_proposal(self, proposal_data: Dict[str, Any]) -&gt; str
-async def get_proposal_status(self, proposal_id: str) -&gt; Optional[str]</file><file path="Platform/governance/policy.py">class PolicyEngine
+async def get_proposal_status(self, proposal_id: str) -&gt; Optional[str]</file><file path="platform_py/governance/policy.py">class PolicyEngine
 ⋮----
 def __init__(self)
-async def check_policy(self, action: str, resource: str, context: Dict[str, Any]) -&gt; bool</file><file path="Platform/market/__init__.py">__all__ = [&quot;VenueAdapter&quot;, &quot;UniswapV3Adapter&quot;]</file><file path="Platform/market/adapters.py">logger = structlog.get_logger()
+async def check_policy(self, action: str, resource: str, context: Dict[str, Any]) -&gt; bool</file><file path="platform_py/market/__init__.py">__all__ = [&quot;VenueAdapter&quot;, &quot;UniswapV3Adapter&quot;]</file><file path="platform_py/market/adapters.py">logger = structlog.get_logger()
 class VenueAdapter(ABC)
 ⋮----
 @abstractmethod
@@ -444,35 +547,90 @@ class VenueAdapter(ABC)
 class UniswapV3Adapter(VenueAdapter)
 ⋮----
 async def get_order_book(self, pair: TradingPair) -&gt; Optional[OrderBook]
-async def get_liquidity(self, pair: TradingPair) -&gt; Optional[Dict[str, Any]]</file><file path="Platform/monitoring/__init__.py">__all__ = [&quot;intents_submitted&quot;, &quot;intents_completed&quot;, &quot;intent_processing_time&quot;, &quot;strategy_pnl&quot;, &quot;strategy_active_intents&quot;, &quot;system_errors&quot;]</file><file path="Platform/monitoring/metrics.py">intents_submitted = Counter(&apos;intents_submitted_total&apos;, &apos;Total number of submitted intents&apos;, [&apos;strategy_id&apos;])
+async def get_liquidity(self, pair: TradingPair) -&gt; Optional[Dict[str, Any]]</file><file path="platform_py/monitoring/__init__.py">__all__ = [&quot;intents_submitted&quot;, &quot;intents_completed&quot;, &quot;intent_processing_time&quot;, &quot;strategy_pnl&quot;, &quot;strategy_active_intents&quot;, &quot;system_errors&quot;]</file><file path="platform_py/monitoring/metrics.py">intents_submitted = Counter(&apos;intents_submitted_total&apos;, &apos;Total number of submitted intents&apos;, [&apos;strategy_id&apos;])
 intents_completed = Counter(&apos;intents_completed_total&apos;, &apos;Total number of completed intents&apos;, [&apos;strategy_id&apos;, &apos;status&apos;])
 intent_processing_time = Gauge(&apos;intent_processing_time_seconds&apos;, &apos;Time to process an intent&apos;, [&apos;strategy_id&apos;])
 strategy_pnl = Gauge(&apos;strategy_pnl_total&apos;, &apos;Profit and loss for a strategy&apos;, [&apos;strategy_id&apos;])
 strategy_active_intents = Gauge(&apos;strategy_active_intents&apos;, &apos;Number of active intents for a strategy&apos;, [&apos;strategy_id&apos;])
-system_errors = Counter(&apos;system_errors_total&apos;, &apos;Total number of system errors&apos;, [&apos;service&apos;])</file><file path="Platform/risk/__init__.py">__all__ = [&quot;RiskEngine&quot;, &quot;CircuitBreaker&quot;]</file><file path="Platform/risk/circuit_breaker.py">class CircuitBreaker
+system_errors = Counter(&apos;system_errors_total&apos;, &apos;Total number of system errors&apos;, [&apos;service&apos;])</file><file path="platform_py/risk/__init__.py">__all__ = [&quot;RiskEngine&quot;, &quot;CircuitBreaker&quot;]</file><file path="platform_py/risk/circuit_breaker.py">class CircuitBreaker
 ⋮----
 def __init__(self)
 async def check_and_trip(self) -&gt; bool
 def is_tripped(self) -&gt; bool
-def reset(self)</file><file path="Platform/risk/engine.py">class RiskEngine
+def reset(self)</file><file path="platform_py/risk/engine.py">class RiskDecision(Dict[str, Any])
 ⋮----
-def __init__(self)
-async def evaluate_risk(self, intent: Intent) -&gt; Optional[Dict[str, Any]]
-async def check_limits(self, intent: Intent) -&gt; bool</file><file path="Platform/settlement/__init__.py">__all__ = [&quot;SettlementManager&quot;, &quot;NettingEngine&quot;]</file><file path="Platform/settlement/manager.py">class SettlementManager
+@property
+    def approved(self) -&gt; bool
+class RiskEngine
+⋮----
+MAX_NOTIONAL_USD = Decimal(&quot;10000&quot;)
+MAX_SLIPPAGE = Decimal(&quot;0.05&quot;)
+async def evaluate_risk(self, intent: Intent) -&gt; RiskDecision
+⋮----
+amount = None
+⋮----
+amount = intent.assets[0].amount</file><file path="platform_py/settlement/__init__.py">__all__ = [&quot;SettlementManager&quot;, &quot;NettingEngine&quot;]</file><file path="platform_py/settlement/manager.py">class SettlementManager
 ⋮----
 def __init__(self)
 async def queue_for_settlement(self, trade_id: str, trade_data: Dict[str, Any])
-async def process_settlements(self)</file><file path="Platform/settlement/netting.py">class NettingEngine
+async def process_settlements(self)</file><file path="platform_py/settlement/netting.py">class NettingEngine
 ⋮----
 def __init__(self)
-async def net_positions(self) -&gt; Dict[str, Any]</file><file path="Platform/state/__init__.py">__all__ = [&quot;StateCoordinator&quot;, &quot;ReconciliationService&quot;]</file><file path="Platform/state/coordinator.py">class StateCoordinator
+async def net_positions(self) -&gt; Dict[str, Any]</file><file path="platform_py/state/__init__.py">__all__ = [&quot;StateCoordinator&quot;, &quot;ReconciliationService&quot;]</file><file path="platform_py/state/coordinator.py">logger = structlog.get_logger()
+class StateCoordinator
+⋮----
+def __init__(self, db_pool: Optional[asyncpg.Pool] = None, redis_client: Optional[redis.Redis] = None)
+async def apply_event(self, env: EventEnvelope) -&gt; None
+⋮----
+topic = env.topic
+payload = env.payload
+corr = env.correlationId
+⋮----
+seq = self._seq_by_corr.get(corr, 0) + 1
+⋮----
+seq = env.sequence
+⋮----
+iid = payload.get(&quot;id&quot;) or payload.get(&quot;intentId&quot;)
+⋮----
+iid = payload.get(&quot;intentId&quot;)
+⋮----
+agg = self._intents.setdefault(iid, {})
+⋮----
+pid = payload.get(&quot;planId&quot;)
+⋮----
+async def get_intent_state(self, intent_id: str) -&gt; Optional[Dict[str, Any]]
+async def get_plan_state(self, plan_id: str) -&gt; Optional[Dict[str, Any]]
+async def _is_duplicate(self, event_id: str) -&gt; bool
+⋮----
+key = f&quot;events:seen:{event_id}&quot;
+added = await self._redis.setnx(key, &quot;1&quot;)
+⋮----
+async def _persist_event(self, env: EventEnvelope) -&gt; None
+⋮----
+query = (
+⋮----
+async def _update_redis_models(self, env: EventEnvelope) -&gt; None
+⋮----
+p = env.payload
+now_iso = env.timestamp.isoformat()
+⋮----
+iid = p.get(&quot;intentId&quot;) or p.get(&quot;id&quot;)
+⋮----
+val = {&quot;state&quot;: &quot;Submitted&quot;, &quot;last_event&quot;: env.eventId, &quot;updated_at&quot;: now_iso}
+⋮----
+iid = p.get(&quot;intentId&quot;)
+⋮----
+key = f&quot;intent:{iid}&quot;
+cur = await self._get_json(key)
+⋮----
+pid = p.get(&quot;planId&quot;)
+⋮----
+async def _get_json(self, key: str) -&gt; Dict[str, Any]
+⋮----
+val = await self._redis.get(key) if self._redis else None</file><file path="platform_py/state/reconciliation.py">class ReconciliationService
 ⋮----
 def __init__(self)
-async def apply_event(self, event: Event)
-async def get_state(self, aggregate_id: str) -&gt; Optional[Dict[str, Any]]</file><file path="Platform/state/reconciliation.py">class ReconciliationService
-⋮----
-def __init__(self)
-async def reconcile_state(self)</file><file path="Platform/strategies/examples/__init__.py">__all__ = [</file><file path="Platform/strategies/examples/momentum.py">logger = structlog.get_logger()
+async def reconcile_state(self)</file><file path="platform_py/strategies/examples/__init__.py">__all__ = [</file><file path="platform_py/strategies/examples/momentum.py">logger = structlog.get_logger()
 class MomentumFeatures
 ⋮----
 @staticmethod
@@ -640,7 +798,7 @@ slippage = 0.001
 fees = 0.0005
 trade_return = 0.0
 ⋮----
-trade_return = -slippage - fees</file><file path="Platform/strategies/__init__.py">__all__ = [</file><file path="Platform/strategies/base.py">logger = structlog.get_logger()
+trade_return = -slippage - fees</file><file path="platform_py/strategies/__init__.py">__all__ = [</file><file path="platform_py/strategies/base.py">logger = structlog.get_logger()
 ⋮----
 @dataclass
 class StrategyManifest
@@ -768,61 +926,7 @@ schema = self.manifest.config_schema
 value = self.config[key]
 value_type = requirements.get(&apos;type&apos;)
 ⋮----
-async def health_check(self) -&gt; Dict[str, Any]</file><file path="Platform/streaming/__init__.py">__all__ = [&quot;EventStream&quot;, &quot;StreamConfig&quot;]</file><file path="Platform/streaming/event_stream.py">logger = structlog.get_logger()
-⋮----
-@dataclass
-class StreamConfig
-⋮----
-stream_name: str = &quot;platform_events&quot;
-subjects: List[str] = field(default_factory=lambda: [&quot;intent.*&quot;, &quot;strategy.*&quot;, &quot;market.*&quot;, &quot;execution.*&quot;, &quot;system.*&quot;])
-durable_name: str = &quot;platform_worker&quot;
-retention_policy: str = &quot;workqueue&quot;
-max_age_seconds: int = 86400
-class EventStream
-⋮----
-def __init__(self, nats_config=config.nats, redis_config=config.redis, stream_config=StreamConfig())
-async def initialize(self) -&gt; None
-async def _setup_jetstream(self) -&gt; None
-⋮----
-stream = await self.jetstream.add_stream(
-⋮----
-async def shutdown(self) -&gt; None
-async def publish(self, subject: str, event: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -&gt; None
-⋮----
-dedup_id = event.get(&apos;id&apos;, str(UUID()))
-message_data = json.dumps(event).encode(&apos;utf-8&apos;)
-⋮----
-ack = await self.jetstream.publish(
-⋮----
-async def subscribe(self, subject: str, handler: Callable[[Dict[str, Any]], None], durable_name: Optional[str] = None) -&gt; None
-⋮----
-durable = durable_name or f&quot;{self.stream_config.durable_name}_{subject.replace(&apos;.*&apos;, &apos;_wildcard&apos;)}&quot;
-async def message_handler(msg)
-⋮----
-event_data = json.loads(msg.data.decode())
-⋮----
-async def _buffer_in_redis(self, subject: str, event: Dict[str, Any]) -&gt; None
-⋮----
-stream_key = f&quot;events:{subject}&quot;
-pipeline = self.redis_client.pipeline()
-⋮----
-async def get_stream_state(self, stream_name: Optional[str] = None) -&gt; Optional[Dict[str, Any]]
-⋮----
-stream_info = await self.jetstream.stream_info(stream_name or self.stream_config.stream_name)
-⋮----
-async def replay_events_from_redis(self, subject: str, from_timestamp_ms: int, to_timestamp_ms: Optional[int] = None) -&gt; List[Dict[str, Any]]
-⋮----
-start = from_timestamp_ms
-end = to_timestamp_ms or &quot;+&quot;
-results = await self.redis_client.xrange(stream_key, start, end)
-⋮----
-async def _nats_error_cb(self, e)
-async def _nats_reconnected_cb(self)
-async def _nats_disconnected_cb(self)
-async def _nats_closed_cb(self)</file><file path="Platform/types/__init__.py">_EVENTS_AVAILABLE = True
-⋮----
-_EVENTS_AVAILABLE = False
-__all__ = [</file><file path="Platform/types/common.py">class Chain(Enum)
+async def health_check(self) -&gt; Dict[str, Any]</file><file path="platform_py/streaming/__init__.py">__all__ = [&quot;EventStream&quot;, &quot;StreamConfig&quot;]</file><file path="platform_py/types/__init__.py">__all__ = [</file><file path="platform_py/types/common.py">class Chain(Enum)
 ⋮----
 ETHEREUM = 1
 ARBITRUM = 42161
@@ -999,7 +1103,32 @@ def get_asset_by_address(address: str, chain_id: int) -&gt; Optional[Asset]
 def create_trading_pair(base_key: str, quote_key: str, venue: Venue) -&gt; Optional[TradingPair]
 ⋮----
 base = get_asset_by_key(base_key)
-quote = get_asset_by_key(quote_key)</file><file path="Platform/types/events.py">EventPayloadType = TypeVar(&apos;EventPayloadType&apos;, bound=&apos;EventPayload&apos;)
+quote = get_asset_by_key(quote_key)</file><file path="platform_py/types/envelope.py">_CROCKFORD32 = &quot;0123456789ABCDEFGHJKMNPQRSTVWXYZ&quot;
+def _encode_base32(data: bytes) -&gt; str
+⋮----
+bits = 0
+value = 0
+out = []
+⋮----
+value = (value &lt;&lt; 8) | b
+⋮----
+def ulid(ts: Optional[datetime] = None) -&gt; str
+⋮----
+now = ts or datetime.now(timezone.utc)
+ms = int(now.timestamp() * 1000)
+time_bytes = ms.to_bytes(6, byteorder=&quot;big&quot;)
+rand_bytes = os.urandom(10)
+⋮----
+class EventEnvelope(BaseModel)
+⋮----
+eventId: str = Field(..., description=&quot;ULID event identifier&quot;)
+timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+topic: str
+correlationId: str
+causationId: Optional[str] = None
+payload: Dict[str, Any]
+version: int = 1
+sequence: Optional[int] = None</file><file path="platform_py/types/events.py">EventPayloadType = TypeVar(&apos;EventPayloadType&apos;, bound=&apos;EventPayload&apos;)
 class EventPayload(BaseModel, ABC)
 ⋮----
 class Config
@@ -1196,7 +1325,7 @@ class EventProjection(BaseModel)
 id: UUID = Field(..., description=&quot;Projection ID&quot;)
 last_processed_event: Optional[UUID] = Field(None, description=&quot;Last processed event ID&quot;)
 last_processed_timestamp: Optional[datetime] = Field(None, description=&quot;Last processed timestamp&quot;)
-version: int = Field(default=1, description=&quot;Projection version&quot;)</file><file path="Platform/types/intent.py">class IntentType(Enum)
+version: int = Field(default=1, description=&quot;Projection version&quot;)</file><file path="platform_py/types/intent.py">class IntentType(Enum)
 ⋮----
 ACQUIRE = &quot;acquire&quot;
 DISPOSE = &quot;dispose&quot;
@@ -1349,7 +1478,7 @@ reason: Optional[str] = Field(None, description=&quot;Reason for status change&q
 filled_amount: Optional[Decimal] = Field(None, description=&quot;Amount filled&quot;)
 execution_details: Dict[str, Any] = Field(default_factory=dict, description=&quot;Execution details&quot;)
 ⋮----
-assets = [</file><file path="Platform/types/rust_bridge.py">class OptimizeRouteParams(BaseModel)
+assets = [</file><file path="platform_py/types/rust_bridge.py">class OptimizeRouteParams(BaseModel)
 ⋮----
 token_in: str = Field(..., description=&quot;Input token address or symbol&quot;)
 token_out: str = Field(..., description=&quot;Output token address or symbol&quot;)
@@ -1379,31 +1508,16 @@ input: Optional[str] = None
 hash: Optional[str] = None
 ⋮----
 @validator(&quot;input&quot;)
-    def ensure_hex_prefix(cls, v: Optional[str]) -&gt; Optional[str]</file><file path="Platform/__init__.py">_builtin_platform = importlib.import_module(&quot;platform&quot;)</file><file path="Platform/app.py">logger = structlog.get_logger()
-⋮----
-@asynccontextmanager
-async def lifespan(app: FastAPI) -&gt; AsyncGenerator[None, None]
-def create_app() -&gt; FastAPI
-⋮----
-app = FastAPI(
-⋮----
-async def request_id_dispatch(request, call_next)
-⋮----
-req_id = request.headers.get(&quot;X-Request-ID&quot;) or str(uuid.uuid4())
-⋮----
-response = await call_next(request)
-⋮----
-@app.get(&quot;/health&quot;)
-    async def health_check()</file><file path="Platform/config.py">class DatabaseConfig(PydanticBaseSettings)
+    def ensure_hex_prefix(cls, v: Optional[str]) -&gt; Optional[str]</file><file path="platform_py/__init__.py">_builtin_platform = importlib.import_module(&quot;platform&quot;)</file><file path="platform_py/config.py">class DatabaseConfig(PydanticBaseSettings)
 ⋮----
 host: str = Field(default=&quot;localhost&quot;, description=&quot;Database host&quot;)
 port: int = Field(default=5432, description=&quot;Database port&quot;)
-database: str = Field(default=&quot;platform&quot;, description=&quot;Database name&quot;)
+database: str = Field(default=&quot;platform_events&quot;, description=&quot;Database name&quot;)
 username: str = Field(default=&quot;platform&quot;, description=&quot;Database username&quot;)
-password: str = Field(default=&quot;platform&quot;, description=&quot;Database password&quot;)
-pool_size: int = Field(default=10, description=&quot;Connection pool size&quot;)
-max_overflow: int = Field(default=20, description=&quot;Max pool overflow&quot;)
-max_size: int = Field(default=20, description=&quot;Maximum pool size (use instead of max_overflow)&quot;)
+password: str = Field(default=&quot;platform_secure_pass&quot;, description=&quot;Database password&quot;)
+pool_size: int = Field(default=20, description=&quot;Connection pool size&quot;)
+max_overflow: int = Field(default=10, description=&quot;Max pool overflow&quot;)
+max_size: int = Field(default=30, description=&quot;Maximum pool size (use instead of max_overflow)&quot;)
 ⋮----
 @property
     def url(self) -&gt; str
@@ -1413,7 +1527,8 @@ host: str = Field(default=&quot;localhost&quot;, description=&quot;Redis host&qu
 port: int = Field(default=6379, description=&quot;Redis port&quot;)
 db: int = Field(default=0, description=&quot;Redis database number&quot;)
 password: Optional[str] = Field(default=None, description=&quot;Redis password&quot;)
-max_connections: int = Field(default=20, description=&quot;Max connections&quot;)
+max_connections: int = Field(default=50, description=&quot;Max connections&quot;)
+decode_responses: bool = Field(default=True, description=&quot;Return strings instead of bytes from redis client&quot;)
 ⋮----
 auth = f&quot;:{self.password}@&quot; if self.password else &quot;&quot;
 ⋮----
@@ -1422,12 +1537,30 @@ class NATSConfig(PydanticBaseSettings)
 servers: List[str] = Field(default=[&quot;nats://localhost:4222&quot;], description=&quot;NATS servers&quot;)
 max_reconnect_attempts: int = Field(default=60, description=&quot;Max reconnection attempts&quot;)
 reconnect_time_wait: float = Field(default=2.0, description=&quot;Reconnect wait time&quot;)
+class NetworkConfig(PydanticBaseSettings)
+⋮----
+name: str = Field(default=&quot;sepolia&quot;, description=&quot;Network name (e.g., mainnet, sepolia, arbitrum, base)&quot;)
+chain_id: int = Field(default=11155111, description=&quot;EVM chain id&quot;)
+rpc_url_template: str = Field(default=&quot;https://eth-sepolia.g.alchemy.com/v2/{API_KEY}&quot;, description=&quot;RPC URL template with optional {API_KEY} placeholder&quot;)
+api_key: Optional[str] = Field(default=None, description=&quot;Provider API key to inject into RPC URL template&quot;)
+block_confirmations: int = Field(default=6, description=&quot;Blocks to wait for confirmations&quot;)
+def resolve_rpc_url(self) -&gt; str
+⋮----
+url = self.rpc_url_template
+⋮----
 class RayConfig(PydanticBaseSettings)
 ⋮----
-address: Optional[str] = Field(default=None, description=&quot;Ray cluster address&quot;)
-num_cpus: Optional[int] = Field(default=None, description=&quot;Number of CPUs to use&quot;)
-num_gpus: Optional[int] = Field(default=None, description=&quot;Number of GPUs to use&quot;)
-object_store_memory: Optional[int] = Field(default=None, description=&quot;Object store memory&quot;)
+address: Optional[str] = Field(default=&quot;ray://localhost:10001&quot;, description=&quot;Ray cluster address&quot;)
+num_cpus: Optional[int] = Field(default=4, description=&quot;Number of CPUs to use&quot;)
+num_gpus: Optional[int] = Field(default=0, description=&quot;Number of GPUs to use&quot;)
+object_store_memory: Optional[int] = Field(default=2147483648, description=&quot;Object store memory&quot;)
+⋮----
+@field_validator(&quot;address&quot;, mode=&quot;before&quot;)
+@classmethod
+    def _normalize_address(cls, v)
+⋮----
+default_addr = &quot;ray://localhost:10001&quot;
+⋮----
 class MLConfig(PydanticBaseSettings)
 ⋮----
 model_cache_dir: str = Field(default=&quot;./models&quot;, description=&quot;ML model cache directory&quot;)
@@ -1445,22 +1578,41 @@ redis: RedisConfig = Field(default_factory=RedisConfig)
 nats: NATSConfig = Field(default_factory=NATSConfig)
 ray: RayConfig = Field(default_factory=RayConfig)
 ml: MLConfig = Field(default_factory=MLConfig)
+network: NetworkConfig = Field(default_factory=NetworkConfig)
 rpc_urls: Dict[int, str] = Field(default_factory=dict)
+⋮----
+@field_validator(&quot;rpc_urls&quot;, mode=&quot;before&quot;)
+@classmethod
+    def _coerce_rpc_urls(cls, v)
+⋮----
+data = v
+⋮----
+data = json.loads(v)
+⋮----
+coerced = {}
+⋮----
 max_intent_queue_size: int = Field(default=10000, description=&quot;Maximum intent queue size&quot;)
 intent_processing_timeout: float = Field(default=30.0, description=&quot;Intent processing timeout&quot;)
 event_buffer_size: int = Field(default=1000, description=&quot;Event buffer size&quot;)
-class Config
-⋮----
-env_prefix = &quot;PLATFORM_&quot;
-env_nested_delimiter = &quot;__&quot;
-case_sensitive = False
-config = PlatformConfig()</file><file path="Platform/dependencies.py">logger = structlog.get_logger()
+enable_legacy_intent_queue: bool = Field(default=False, description=&quot;Enable legacy intent queue processor&quot;)
+model_config = SettingsConfigDict(
+def get_rpc_url(self, chain_id: int) -&gt; str
+config = PlatformConfig()</file><file path="platform_py/dependencies.py">logger = structlog.get_logger()
 class CoreComponents
 ⋮----
 def __init__(self)
 async def initialize(self) -&gt; None
+⋮----
+risk_engine = RiskEngine()
+⋮----
+async def _subscribe_state_coordinator(self, event_stream)
+⋮----
+async def handler(evt: dict)
+⋮----
+env = EventEnvelope(**evt)
+⋮----
 async def shutdown(self) -&gt; None
-components = CoreComponents()</file><file path="Platform/rust_bindings.py">logger = structlog.get_logger()
+components = CoreComponents()</file><file path="platform_py/rust_bindings.py">logger = structlog.get_logger()
 _platform_rust = None
 ⋮----
 def _fallback_decode_transaction(tx: Any) -&gt; Dict[str, Any]
@@ -1495,7 +1647,7 @@ def aggregate_order_books(books: List[Any]) -&gt; Any
 ⋮----
 entries = [AggregateOrderBookEntry.parse_obj(b).dict() for b in books]
 ⋮----
-result = _platform_rust.aggregate_order_books(entries)</file><file path="Platform/services.py">logger = structlog.get_logger()
+result = _platform_rust.aggregate_order_books(entries)</file><file path="platform_py/services.py">logger = structlog.get_logger()
 class ServiceConnector
 ⋮----
 def __init__(self)
@@ -1504,7 +1656,493 @@ async def connect_all(self) -&gt; None
 max_size = getattr(config.database, &quot;max_size&quot;, None) or config.database.max_overflow
 ⋮----
 async def disconnect_all(self) -&gt; None
-services = ServiceConnector()</file><file path="src/chain_monitor.rs">use pyo3::types::PyDict;
+services = ServiceConnector()</file><file path="platform_py/setup_event_loop.py">logger = logging.getLogger(__name__)
+def setup_event_loop() -&gt; None</file><file path="src/lib.rs">mod execution;
+mod chain_monitor;
+mod market_data;
+mod transaction;
+⋮----
+.enable_all()
+.thread_name(&quot;platform-rt&quot;)
+.max_blocking_threads(1024)
+.build()
+.expect(&quot;tokio runtime&quot;)
+⋮----
+pub fn initialize_rust_runtime() -&gt; PyResult&lt;()&gt; {
+let _ = TRACING_INIT.get_or_init(|| {
+⋮----
+Ok(())
+⋮----
+pub fn runtime_handle() -&gt; &amp;&apos;static tokio::runtime::Handle {
+GLOBAL_RUNTIME.handle()
+⋮----
+fn platform_rust(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+m.add_function(wrap_pyfunction!(initialize_rust_runtime, m)?)?;</file><file path="src/repomix-output.xml">This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+&lt;file_summary&gt;
+This section contains a summary of this file.
+&lt;purpose&gt;
+This file contains a packed representation of the entire repository&apos;s contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+&lt;/purpose&gt;
+&lt;file_format&gt;
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+&lt;/file_format&gt;
+&lt;usage_guidelines&gt;
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+&lt;/usage_guidelines&gt;
+&lt;notes&gt;
+- Some files may have been excluded based on .gitignore rules and Repomix&apos;s configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+&lt;/notes&gt;
+&lt;/file_summary&gt;
+&lt;directory_structure&gt;
+chain_monitor.rs
+execution.rs
+lib.rs
+market_data.rs
+transaction.rs
+cargo.toml
+&lt;/directory_structure&gt;
+&lt;files&gt;
+This section contains the contents of the repository&apos;s files.
+&lt;file path=&quot;chain_monitor.rs&quot;&gt;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use pyo3::exceptions::PyValueError;
+use ethers::types::Transaction;
+use rlp;
+#[pyfunction]
+fn decode_transaction(py: Python, tx_hex: &amp;str) -&gt; PyResult&lt;PyObject&gt; {
+    let bytes = hex::decode(tx_hex.trim_start_matches(&quot;0x&quot;))
+        .map_err(|e| PyValueError::new_err(format!(&quot;invalid hex: {e}&quot;)))?;
+    let tx: Transaction = rlp::decode(&amp;bytes)
+        .map_err(|e| PyValueError::new_err(format!(&quot;rlp decode failed: {e}&quot;)))?;
+    let out = PyDict::new(py);
+    out.set_item(&quot;from&quot;, format!(&quot;{:#x}&quot;, tx.from))?;
+    if let Some(to) = tx.to {
+        out.set_item(&quot;to&quot;, format!(&quot;{:#x}&quot;, to))?;
+    } else {
+        out.set_item(&quot;to&quot;, Option::&lt;String&gt;::None)?;
+    }
+    out.set_item(&quot;nonce&quot;, tx.nonce.as_u64())?;
+    // Use strings for big ints to avoid extra features
+    out.set_item(&quot;gas&quot;, tx.gas.to_string())?;
+    if let Some(p) = tx.gas_price { out.set_item(&quot;gas_price&quot;, p.to_string())?; }
+    else { out.set_item(&quot;gas_price&quot;, Option::&lt;String&gt;::None)?; }
+    out.set_item(&quot;value&quot;, tx.value.to_string())?;
+    out.set_item(&quot;input&quot;, format!(&quot;0x{}&quot;, hex::encode(tx.input)))?;
+    out.set_item(&quot;hash&quot;, format!(&quot;{:#x}&quot;, tx.hash))?;
+    Ok(out.into_any().unbind().into())
+}
+pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+    m.add_function(wrap_pyfunction!(decode_transaction, m)?)?;
+    Ok(())
+}
+&lt;/file&gt;
+&lt;file path=&quot;execution.rs&quot;&gt;
+// execution.rs
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
+#[derive(Clone, Debug)]
+struct Token { address: String, symbol: String }
+#[derive(Clone, Debug)]
+struct Pool {
+    address: String,
+    token0: Token,
+    token1: Token,
+    fee: u32,
+    liquidity: u128,
+}
+struct Route { path: Vec&lt;String&gt;, output_amount: u128 }
+#[pyclass]
+pub struct ExecutionEngine {
+    #[pyo3(get)]
+    engine_id: String,
+    pools: Arc&lt;RwLock&lt;HashMap&lt;String, Pool&gt;&gt;&gt;, // address -&gt; Pool
+}
+#[pymethods]
+impl ExecutionEngine {
+    #[new]
+    fn new() -&gt; Self {
+        Self {
+            engine_id: uuid::Uuid::new_v4().to_string(),
+            pools: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+    #[pyo3(text_signature = &quot;($self, params)&quot;)]
+    fn optimize_route(&amp;self, py: Python, params: &amp;Bound&lt;&apos;_, PyDict&gt;) -&gt; PyResult&lt;PyObject&gt; {
+        // Parse inputs
+        let token_in: String = params.get_item(&quot;token_in&quot;)?
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing &apos;token_in&apos;&quot;))?
+            .extract()?;
+        let token_out: String = params.get_item(&quot;token_out&quot;)?
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing &apos;token_out&apos;&quot;))?
+            .extract()?;
+        let amount_in: u128 = params.get_item(&quot;amount_in&quot;)?
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing &apos;amount_in&apos;&quot;))?
+            .extract()?;
+        // Compute without the GIL
+        let pools_snapshot: Vec&lt;Pool&gt; = {
+            let guard = self.pools.read().map_err(|_| {
+                pyo3::exceptions::PyRuntimeError::new_err(&quot;pools lock poisoned&quot;)
+            })?;
+            guard.values().cloned().collect()
+        };
+        let route = py.allow_threads(|| {
+            // Dijkstra-like maximization. Use addresses, not symbols.
+            use std::cmp::Ordering;
+            use std::collections::{BinaryHeap, HashMap};
+            #[derive(Eq, PartialEq)]
+            struct Node { amt: u128, token: String }
+            impl Ord for Node {
+                fn cmp(&amp;self, other: &amp;Self) -&gt; Ordering { self.amt.cmp(&amp;other.amt) }
+            }
+            impl PartialOrd for Node {
+                fn partial_cmp(&amp;self, other: &amp;Self) -&gt; Option&lt;Ordering&gt; { Some(self.cmp(other)) }
+            }
+            let mut dist: HashMap&lt;String, u128&gt; = HashMap::new();
+            let mut prev: HashMap&lt;String, String&gt; = HashMap::new();
+            let mut pq: BinaryHeap&lt;Node&gt; = BinaryHeap::new();
+            dist.insert(token_in.clone(), amount_in);
+            pq.push(Node { amt: amount_in, token: token_in.clone() });
+            while let Some(Node { amt, token }) = pq.pop() {
+                if amt &lt; *dist.get(&amp;token).unwrap_or(&amp;0) { continue; }
+                for pool in &amp;pools_snapshot {
+                    // Determine direction by matching address or symbol if address missing
+                    let mut nexts = Vec::new();
+                    if pool.token0.address == token || pool.token0.symbol == token {
+                        let out = Self::calculate_amount_out(pool, amt);
+                        nexts.push((&amp;pool.token1, out));
+                    }
+                    if pool.token1.address == token || pool.token1.symbol == token {
+                        let out = Self::calculate_amount_out(pool, amt);
+                        nexts.push((&amp;pool.token0, out));
+                    }
+                    for (nt, out_amt) in nexts {
+                        if out_amt &gt; *dist.get(&amp;nt.address).unwrap_or(&amp;0) {
+                            dist.insert(nt.address.clone(), out_amt);
+                            prev.insert(nt.address.clone(), token.clone());
+                            pq.push(Node { amt: out_amt, token: nt.address.clone() });
+                        }
+                    }
+                }
+            }
+            // Reconstruct path by addresses
+            if !dist.contains_key(&amp;token_out) {
+                return None;
+            }
+            let mut path = Vec::new();
+            let mut cur = token_out.clone();
+            while let Some(p) = prev.get(&amp;cur) {
+                path.push(cur.clone());
+                cur = p.clone();
+            }
+            path.push(token_in.clone());
+            path.reverse();
+            Some(Route { path, output_amount: *dist.get(&amp;token_out).unwrap_or(&amp;0) })
+        });
+        match route {
+            Some(r) =&gt; {
+                let out = PyDict::new(py);
+                let path_list = PyList::new(py, &amp;r.path)?;
+                out.set_item(&quot;path&quot;, &amp;path_list)?;
+                out.set_item(&quot;output_amount&quot;, r.output_amount)?;
+                Ok(out.into_any().unbind().into())
+            }
+            None =&gt; Ok(py.None()),
+        }
+    }
+    #[pyo3(text_signature = &quot;($self, pools_data)&quot;)]
+    fn update_pools(&amp;self, _py: Python, pools_data: &amp;Bound&lt;&apos;_, PyList&gt;) -&gt; PyResult&lt;()&gt; {
+        let mut map = self.pools.write().map_err(|_| {
+            pyo3::exceptions::PyRuntimeError::new_err(&quot;pools lock poisoned&quot;)
+        })?;
+        map.clear();
+        for pool_any in pools_data.iter() {
+            let pool_dict: &amp;Bound&lt;PyDict&gt; = pool_any.downcast()?;
+            let token0_item = pool_dict.get_item(&quot;token0&quot;)?
+                .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token0&quot;))?;
+            let token0: &amp;Bound&lt;PyDict&gt; = token0_item.downcast()?;
+            let token1_item = pool_dict.get_item(&quot;token1&quot;)?
+                .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token1&quot;))?;
+            let token1: &amp;Bound&lt;PyDict&gt; = token1_item.downcast()?;
+            let pool = Pool {
+                address: pool_dict.get_item(&quot;address&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing address&quot;))?.extract()?,
+                token0: Token {
+                    address: token0.get_item(&quot;address&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token0.address&quot;))?.extract()?,
+                    symbol:  token0.get_item(&quot;symbol&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token0.symbol&quot;))?.extract()?,
+                },
+                token1: Token {
+                    address: token1.get_item(&quot;address&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token1.address&quot;))?.extract()?,
+                    symbol:  token1.get_item(&quot;symbol&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing token1.symbol&quot;))?.extract()?,
+                },
+                fee: pool_dict.get_item(&quot;fee&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing fee&quot;))?.extract()?,
+                liquidity: pool_dict.get_item(&quot;liquidity&quot;)?.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(&quot;missing liquidity&quot;))?.extract()?,
+            };
+            map.insert(pool.address.clone(), pool);
+        }
+        Ok(())
+    }
+}
+// Pure Rust helper
+impl ExecutionEngine {
+    #[inline]
+    fn calculate_amount_out(pool: &amp;Pool, amount_in: u128) -&gt; u128 {
+        // Replace with correct AMM formula later
+        amount_in.saturating_sub((amount_in as u128 * pool.fee as u128) / 1_000_000u128)
+    }
+}
+pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+    m.add_class::&lt;ExecutionEngine&gt;()?;
+    Ok(())
+}
+&lt;/file&gt;
+&lt;file path=&quot;lib.rs&quot;&gt;
+// lib.rs
+use once_cell::sync::{Lazy, OnceCell};
+use tokio::runtime::{Builder, Runtime};
+use pyo3::prelude::*;
+mod execution;
+mod chain_monitor;
+mod market_data;
+mod transaction;
+static GLOBAL_RUNTIME: Lazy&lt;Runtime&gt; = Lazy::new(|| {
+    Builder::new_multi_thread()
+        .enable_all()
+        .thread_name(&quot;platform-rt&quot;)
+        .max_blocking_threads(1024)
+        .build()
+        .expect(&quot;tokio runtime&quot;)
+});
+static TRACING_INIT: OnceCell&lt;()&gt; = OnceCell::new();
+#[pyfunction]
+pub fn initialize_rust_runtime() -&gt; PyResult&lt;()&gt; {
+    // Idempotent, no env-filter feature required
+    let _ = TRACING_INIT.get_or_init(|| {
+        let _ = tracing_subscriber::fmt::try_init();
+        ()
+    });
+    Lazy::force(&amp;GLOBAL_RUNTIME);
+    Ok(())
+}
+#[inline]
+pub fn runtime_handle() -&gt; &amp;&apos;static tokio::runtime::Handle {
+    GLOBAL_RUNTIME.handle()
+}
+#[pymodule]
+fn platform_rust(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+    m.add_function(wrap_pyfunction!(initialize_rust_runtime, m)?)?;
+    execution::register(m)?;
+    chain_monitor::register(m)?;
+    market_data::register(m)?;
+    transaction::register(m)?;
+    Ok(())
+}
+&lt;/file&gt;
+&lt;file path=&quot;market_data.rs&quot;&gt;
+// market_data.rs
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
+use pyo3::exceptions::{PyTypeError, PyKeyError};
+#[pyfunction]
+pub fn aggregate_order_books(py: Python, books: &amp;Bound&lt;&apos;_, PyList&gt;) -&gt; PyResult&lt;PyObject&gt; {
+    let mut bids: Vec&lt;(i64, i64)&gt; = Vec::new();
+    let mut asks: Vec&lt;(i64, i64)&gt; = Vec::new();
+    for any in books.iter() {
+        let d: &amp;Bound&lt;PyDict&gt; = any.downcast()?;
+        let side: String = d.get_item(&quot;side&quot;)?
+            .ok_or_else(|| PyKeyError::new_err(&quot;missing &apos;side&apos;&quot;))?
+            .extract()?;
+        let price: i64 = d.get_item(&quot;price&quot;)?
+            .ok_or_else(|| PyKeyError::new_err(&quot;missing &apos;price&apos;&quot;))?
+            .extract()?;
+        let size: i64 = d.get_item(&quot;size&quot;)?
+            .ok_or_else(|| PyKeyError::new_err(&quot;missing &apos;size&apos;&quot;))?
+            .extract()?;
+        match side.as_str() {
+            &quot;bid&quot; =&gt; bids.push((price, size)),
+            &quot;ask&quot; =&gt; asks.push((price, size)),
+            _ =&gt; return Err(PyTypeError::new_err(&quot;side must be &apos;bid&apos; or &apos;ask&apos;&quot;)),
+        }
+    }
+    // simple aggregate by price
+    use std::collections::BTreeMap;
+    let mut bid_map = BTreeMap::new();
+    let mut ask_map = BTreeMap::new();
+    for (p, s) in bids { *bid_map.entry(p).or_insert(0) += s; }
+    for (p, s) in asks { *ask_map.entry(p).or_insert(0) += s; }
+    let out = PyDict::new(py);
+    let bids_vec: Vec&lt;(i64, i64)&gt; = bid_map.into_iter().collect();
+    let asks_vec: Vec&lt;(i64, i64)&gt; = ask_map.into_iter().collect();
+    let bids_list = PyList::new(py, &amp;bids_vec)?;
+    let asks_list = PyList::new(py, &amp;asks_vec)?;
+    out.set_item(&quot;bids&quot;, &amp;bids_list)?;
+    out.set_item(&quot;asks&quot;, &amp;asks_list)?;
+    Ok(out.into_any().unbind().into())
+}
+pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+    m.add_function(wrap_pyfunction!(aggregate_order_books, m)?)?;
+    Ok(())
+}
+&lt;/file&gt;
+&lt;file path=&quot;transaction.rs&quot;&gt;
+// transaction.rs
+use pyo3::prelude::*;
+use pyo3::types::PyList;
+#[pyclass]
+pub struct TransactionBatcher { max_batch_size: usize }
+#[pymethods]
+impl TransactionBatcher {
+    #[new]
+    #[pyo3(signature = (max_batch_size=None))]
+    fn new(max_batch_size: Option&lt;usize&gt;) -&gt; Self {
+        Self { max_batch_size: max_batch_size.unwrap_or(100) }
+    }
+    fn batch_transactions(&amp;self, py: Python, transactions: Vec&lt;String&gt;) -&gt; PyResult&lt;PyObject&gt; {
+        let chunks: Vec&lt;Vec&lt;String&gt;&gt; = transactions
+            .chunks(self.max_batch_size)
+            .map(|c| c.to_vec())
+            .collect();
+        let py_list = PyList::new(py, chunks)?;
+        Ok(py_list.into_any().unbind().into())
+    }
+}
+pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
+    m.add_class::&lt;TransactionBatcher&gt;()?;
+    Ok(())
+}
+&lt;/file&gt;
+&lt;file path=&quot;cargo.toml&quot;&gt;
+[package]
+name = &quot;platform_rust&quot;
+version = &quot;0.1.0&quot;
+edition = &quot;2021&quot;
+[lib]
+name = &quot;platform_rust&quot;
+crate-type = [&quot;cdylib&quot;]
+[dependencies]
+pyo3 = { version = &quot;0.23.3&quot;, features = [&quot;extension-module&quot;, &quot;abi3-py39&quot;] }
+tokio = { version = &quot;1.42.0&quot;, features = [&quot;full&quot;] }
+# Use the unified ethers crate; remove redundant subcrates
+ethers = { version = &quot;2.0&quot; }
+rayon = &quot;1.10&quot;
+serde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }
+serde_json = &quot;1.0&quot;
+anyhow = &quot;1.0&quot;
+tracing = &quot;0.1&quot;
+tracing-subscriber = &quot;0.3&quot;
+uuid = { version = &quot;1.11&quot;, features = [&quot;v4&quot;] }
+# High-performance data structures
+dashmap = &quot;6.1&quot;
+crossbeam = &quot;0.8&quot;
+parking_lot = &quot;0.12&quot;
+# Web3 and crypto
+hex = &quot;0.4&quot;
+rlp = &quot;0.5&quot;
+sha3 = &quot;0.10&quot;
+once_cell = &quot;1.18&quot;
+# Async runtime
+futures = &quot;0.3&quot;
+async-trait = &quot;0.1&quot;
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+# Build Instructions:
+# For development: maturin develop
+# For release: maturin develop --release
+# Or use make commands: make build (release) or make build-debug
+&lt;/file&gt;
+&lt;/files&gt;</file><file path="platform_py/streaming/event_stream.py">logger = structlog.get_logger()
+⋮----
+@dataclass
+class StreamConfig
+⋮----
+stream_name: str = &quot;platform_events&quot;
+subjects: List[str] = field(default_factory=lambda: [
+durable_name: str = &quot;platform_worker&quot;
+retention_policy: str = &quot;workqueue&quot;
+max_age_seconds: int = 86400
+class EventStream
+⋮----
+def __init__(self, nats_config=config.nats, redis_config=config.redis, stream_config=StreamConfig())
+async def initialize(self) -&gt; None
+async def _setup_jetstream(self) -&gt; None
+⋮----
+stream = await self.jetstream.add_stream(
+⋮----
+async def shutdown(self) -&gt; None
+async def publish(self, subject: str, event: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -&gt; None
+⋮----
+dedup_id = event.get(&apos;id&apos;, str(UUID()))
+message_data = json.dumps(event).encode(&apos;utf-8&apos;)
+⋮----
+ack = await self.jetstream.publish(
+⋮----
+async def subscribe(self, subject: str, handler: Callable[[Dict[str, Any]], None], durable_name: Optional[str] = None) -&gt; None
+⋮----
+durable = durable_name or f&quot;{self.stream_config.durable_name}_{subject.replace(&apos;.*&apos;, &apos;_wildcard&apos;)}&quot;
+async def message_handler(msg)
+⋮----
+event_data = json.loads(msg.data.decode())
+⋮----
+async def publish_envelope(self, env: EventEnvelope, headers: Optional[Dict[str, str]] = None) -&gt; None
+⋮----
+data = env.model_dump()
+msg_id = env.eventId
+⋮----
+async def _buffer_in_redis(self, subject: str, event: Dict[str, Any]) -&gt; None
+⋮----
+stream_key = f&quot;events:{subject}&quot;
+pipeline = self.redis_client.pipeline()
+⋮----
+async def get_stream_state(self, stream_name: Optional[str] = None) -&gt; Optional[Dict[str, Any]]
+⋮----
+stream_info = await self.jetstream.stream_info(stream_name or self.stream_config.stream_name)
+⋮----
+async def replay_events_from_redis(self, subject: str, from_timestamp_ms: int, to_timestamp_ms: Optional[int] = None) -&gt; List[Dict[str, Any]]
+⋮----
+start = from_timestamp_ms
+end = to_timestamp_ms or &quot;+&quot;
+results = await self.redis_client.xrange(stream_key, start, end)
+⋮----
+async def _nats_error_cb(self, e)
+async def _nats_reconnected_cb(self)
+async def _nats_disconnected_cb(self)
+async def _nats_closed_cb(self)</file><file path="platform_py/app.py">logger = structlog.get_logger()
+⋮----
+@asynccontextmanager
+async def lifespan(app: FastAPI) -&gt; AsyncGenerator[None, None]
+def create_app() -&gt; FastAPI
+⋮----
+app = FastAPI(
+⋮----
+async def request_id_dispatch(request, call_next)
+⋮----
+req_id = request.headers.get(&quot;X-Request-ID&quot;) or str(uuid.uuid4())
+⋮----
+response = await call_next(request)
+⋮----
+@app.get(&quot;/health&quot;)
+    async def health_check()</file><file path="src/chain_monitor.rs">use pyo3::types::PyDict;
 use pyo3::exceptions::PyValueError;
 use ethers::types::Transaction;
 use rlp;
@@ -1528,7 +2166,7 @@ else { out.set_item(&quot;gas_price&quot;, Option::&lt;String&gt;::None)?; }
 out.set_item(&quot;value&quot;, tx.value.to_string())?;
 out.set_item(&quot;input&quot;, format!(&quot;0x{}&quot;, hex::encode(tx.input)))?;
 out.set_item(&quot;hash&quot;, format!(&quot;{:#x}&quot;, tx.hash))?;
-Ok(out.into_any().unbind().into())
+Ok(out.into_py(py))
 ⋮----
 pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
 m.add_function(wrap_pyfunction!(decode_transaction, m)?)?;
@@ -1600,9 +2238,9 @@ Some(Route { path, output_amount: *dist.get(&amp;token_out).unwrap_or(&amp;0) })
 ⋮----
 out.set_item(&quot;path&quot;, &amp;path_list)?;
 out.set_item(&quot;output_amount&quot;, r.output_amount)?;
-Ok(out.into_any().unbind().into())
+Ok(out.into_py(py))
 ⋮----
-None =&gt; Ok(py.None()),
+None =&gt; Ok(py.None().into_py(py)),
 ⋮----
 fn update_pools(&amp;self, _py: Python, pools_data: &amp;Bound&lt;&apos;_, PyList&gt;) -&gt; PyResult&lt;()&gt; {
 let mut map = self.pools.write().map_err(|_| {
@@ -1638,27 +2276,7 @@ fn calculate_amount_out(pool: &amp;Pool, amount_in: u128) -&gt; u128 {
 // Replace with correct AMM formula later
 amount_in.saturating_sub((amount_in as u128 * pool.fee as u128) / 1_000_000u128)
 ⋮----
-pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {</file><file path="src/lib.rs">mod execution;
-mod chain_monitor;
-mod market_data;
-mod transaction;
-⋮----
-.enable_all()
-.thread_name(&quot;platform-rt&quot;)
-.max_blocking_threads(1024)
-.build()
-.expect(&quot;tokio runtime&quot;)
-⋮----
-pub fn initialize_rust_runtime() -&gt; PyResult&lt;()&gt; {
-let _ = TRACING_INIT.get_or_init(|| {
-⋮----
-Ok(())
-⋮----
-pub fn runtime_handle() -&gt; &amp;&apos;static tokio::runtime::Handle {
-GLOBAL_RUNTIME.handle()
-⋮----
-fn platform_rust(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
-m.add_function(wrap_pyfunction!(initialize_rust_runtime, m)?)?;</file><file path="src/market_data.rs">pub fn aggregate_order_books(py: Python, books: &amp;Bound&lt;&apos;_, PyList&gt;) -&gt; PyResult&lt;PyObject&gt; {
+pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {</file><file path="src/market_data.rs">pub fn aggregate_order_books(py: Python, books: &amp;Bound&lt;&apos;_, PyList&gt;) -&gt; PyResult&lt;PyObject&gt; {
 ⋮----
 for any in books.iter() {
 let d: &amp;Bound&lt;PyDict&gt; = any.downcast()?;
@@ -1686,7 +2304,7 @@ let asks_vec: Vec&lt;(i64, i64)&gt; = ask_map.into_iter().collect();
 ⋮----
 out.set_item(&quot;bids&quot;, &amp;bids_list)?;
 out.set_item(&quot;asks&quot;, &amp;asks_list)?;
-Ok(out.into_any().unbind().into())
+Ok(out.into_py(py))
 ⋮----
 pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
 m.add_function(wrap_pyfunction!(aggregate_order_books, m)?)?;
@@ -1705,7 +2323,7 @@ fn batch_transactions(&amp;self, py: Python, transactions: Vec&lt;String&gt;) -&
 .map(|c| c.to_vec())
 .collect();
 ⋮----
-Ok(py_list.into_any().unbind().into())
+Ok(py_list.into_py(py))
 ⋮----
 pub fn register(m: &amp;Bound&lt;&apos;_, PyModule&gt;) -&gt; PyResult&lt;()&gt; {
 ⋮----

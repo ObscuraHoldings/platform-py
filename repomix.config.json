@@ -18,7 +18,7 @@
       "sortByChangesMaxCommits": 100
     }
   },
-  "include": ["src/**/*", "Platform/**/*"],
+  "include": ["src/**/*", "platform_py/**/*"],
   "ignore": {
     "useGitignore": true,
     "useDefaultPatterns": true,

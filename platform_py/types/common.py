@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from eth_utils import is_checksum_address, to_checksum_address
 
 
@@ -61,7 +61,7 @@ class Asset(BaseModel):
     name: Optional[str] = Field(None, max_length=100, description="Asset name")
     coingecko_id: Optional[str] = Field(None, description="CoinGecko API ID")
     
-    @validator('address')
+    @field_validator('address')
     def validate_checksum_address(cls, v: str) -> str:
         """Validate and convert to checksum address."""
         if not is_checksum_address(v):
@@ -71,7 +71,7 @@ class Asset(BaseModel):
                 raise ValueError(f"Invalid Ethereum address: {v}")
         return v
     
-    @validator('chain_id')
+    @field_validator('chain_id')
     def validate_supported_chain(cls, v: int) -> int:
         """Validate chain ID is supported."""
         supported_chains = [chain.value for chain in Chain]
@@ -99,8 +99,7 @@ class Asset(BaseModel):
             return False
         return self.unique_id == other.unique_id
     
-    class Config:
-        frozen = True  # Make immutable
+    model_config = ConfigDict(frozen=True)  # Make immutable
 
 
 class TradingPair(BaseModel):
@@ -112,18 +111,18 @@ class TradingPair(BaseModel):
     pool_address: Optional[str] = Field(None, pattern=r'^0x[a-fA-F0-9]{40}$', description="Pool contract address")
     fee_tier: Optional[int] = Field(None, ge=0, description="Fee tier in basis points")
     
-    @root_validator(skip_on_failure=True)
-    def validate_same_chain(cls, values):
+    @model_validator(mode='after')
+    def validate_same_chain(self):
         """Ensure both assets are on the same chain."""
-        base = values.get('base')
-        quote = values.get('quote')
-
+        base = self.base
+        quote = self.quote
         if base and quote and base.chain_id != quote.chain_id:
-            raise ValueError(f"Base and quote assets must be on the same chain. "
-                             f"Base: {base.chain_id}, Quote: {quote.chain_id}")
-        return values
+            raise ValueError(
+                f"Base and quote assets must be on the same chain. Base: {base.chain_id}, Quote: {quote.chain_id}"
+            )
+        return self
     
-    @validator('pool_address')
+    @field_validator('pool_address')
     def validate_pool_address(cls, v: Optional[str]) -> Optional[str]:
         """Validate pool address if provided."""
         if v is not None and not is_checksum_address(v):
@@ -160,8 +159,7 @@ class TradingPair(BaseModel):
                 self.quote == other.quote and 
                 self.venue == other.venue)
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class AssetAmount(BaseModel):
@@ -170,16 +168,19 @@ class AssetAmount(BaseModel):
     asset: Asset = Field(..., description="Asset reference")
     amount: Decimal = Field(..., ge=0, description="Amount in asset units")
     
-    @validator('amount')
-    def validate_amount_precision(cls, v: Decimal, values: Dict[str, Any]) -> Decimal:
+    @model_validator(mode='after')
+    def validate_amount_precision(self) -> 'AssetAmount':
         """Validate amount precision matches asset decimals."""
-        asset = values.get('asset')
-        if asset:
+        asset = self.asset
+        v = self.amount
+        if asset is not None and v is not None:
             # Check that amount doesn't have more decimal places than asset supports
             decimal_places = abs(v.as_tuple().exponent)
             if decimal_places > asset.decimals:
-                raise ValueError(f"Amount precision ({decimal_places}) exceeds asset decimals ({asset.decimals})")
-        return v
+                raise ValueError(
+                    f"Amount precision ({decimal_places}) exceeds asset decimals ({asset.decimals})"
+                )
+        return self
     
     @property
     def raw_amount(self) -> int:
@@ -356,7 +357,7 @@ class TimestampedEntity(BaseModel):
     block_number: Optional[int] = Field(None, ge=0, description="Blockchain block number")
     transaction_hash: Optional[str] = Field(None, pattern=r'^0x[a-fA-F0-9]{64}$', description="Transaction hash")
     
-    @validator('transaction_hash')
+    @field_validator('transaction_hash', mode='before')
     def validate_tx_hash(cls, v: Optional[str]) -> Optional[str]:
         """Validate transaction hash format."""
         if v is not None and not v.startswith('0x'):

@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, List, Union, Type, TypeVar
 from uuid import UUID, uuid4
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.exceptions import InvalidSignature
@@ -25,14 +25,8 @@ EventPayloadType = TypeVar('EventPayloadType', bound='EventPayload')
 class EventPayload(BaseModel, ABC):
     """Base class for all event payloads."""
     
-    class Config:
-        arbitrary_types_allowed = True
-        json_encoders = {
-            UUID: str,
-            datetime: lambda v: v.isoformat(),
-            Asset: lambda v: v.dict(),
-            AssetAmount: lambda v: v.dict(),
-        }
+    # Allow arbitrary types without deprecated Config class
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     @abstractmethod
     def get_event_type(self) -> str:
@@ -79,7 +73,7 @@ class Event(BaseModel):
     signer_public_key: Optional[bytes] = Field(None, description="Public key of the signer")
     hash: Optional[str] = Field(None, description="Event content hash")
     
-    @validator('business_timestamp')
+    @field_validator('business_timestamp')
     def validate_business_timestamp(cls, v: datetime) -> datetime:
         """Validate business timestamp is not in the future."""
         if v > datetime.utcnow():
@@ -95,7 +89,7 @@ class Event(BaseModel):
             "aggregate_id": str(self.aggregate_id),
             "aggregate_version": self.aggregate_version,
             "business_timestamp": self.business_timestamp.isoformat(),
-            "payload": self.payload.dict()
+            "payload": self.payload.model_dump()
         }
         return json.dumps(signing_data, sort_keys=True).encode('utf-8')
     
@@ -366,7 +360,7 @@ def create_intent_submitted_event(
         intent_id=intent.id,
         strategy_id=intent.strategy_id,
         intent_type=intent.type.value,
-        intent_data=intent.dict()
+        intent_data=intent.model_dump()
     )
     
     return Event(
@@ -423,7 +417,7 @@ def create_strategy_signal_event(
         strategy_id=strategy_id,
         signal_type=signal_type,
         signal_strength=signal_strength,
-        assets=[asset.dict() for asset in assets],
+        assets=[asset.model_dump() for asset in assets],
         confidence=confidence,
         features=features or {}
     )
@@ -461,5 +455,4 @@ class EventProjection(BaseModel):
     last_processed_timestamp: Optional[datetime] = Field(None, description="Last processed timestamp")
     version: int = Field(default=1, description="Projection version")
     
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)

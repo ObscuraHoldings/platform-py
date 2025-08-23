@@ -72,12 +72,9 @@ class ServiceConnector:
         # Connect to Ray
         try:
             if not ray.is_initialized():
-                if config.ray.address:
-                    ray.init(address=config.ray.address)
-                else:
-                    # Start a local Ray runtime for dev; avoid 'auto' to prevent failures
-                    ray.init()
-            logger.info("Ray connected", address=config.ray.address or 'local')
+                # Always use configured Ray Client address; do not start local raylet
+                ray.init(address=config.ray.address)
+            logger.info("Ray connected", address=config.ray.address)
         except Exception as e:
             # Non-fatal for API bring-up; warn and proceed without Ray
             logger.warning("Ray unavailable; proceeding without distributed features", error=str(e))

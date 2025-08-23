@@ -3,7 +3,7 @@ Typed models for Rust bridge IO validation.
 """
 
 from typing import List, Optional, Literal, Tuple
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class OptimizeRouteParams(BaseModel):
@@ -38,7 +38,7 @@ class DecodedTransaction(BaseModel):
     input: Optional[str] = None
     hash: Optional[str] = None
 
-    @validator("input")
+    @field_validator("input", mode='before')
     def ensure_hex_prefix(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and not v.startswith("0x"):
             return f"0x{v}"

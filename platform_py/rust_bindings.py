@@ -48,7 +48,7 @@ def _fallback_decode_transaction(tx: Any) -> Dict[str, Any]:
     }
     # Normalize to DecodedTransaction model shape (aliases handle key names)
     try:
-        return DecodedTransaction.parse_obj(result).dict(by_alias=True)
+        return DecodedTransaction.model_validate(result).model_dump(by_alias=True)
     except Exception:
         return result
 
@@ -60,7 +60,7 @@ def _fallback_optimize_route(params: Dict[str, Any]) -> Dict[str, Any]:
         "path": [p for p in (parsed.token_in, parsed.token_out) if p is not None],
         "output_amount": int(parsed.amount_in * 99 // 100),
     }
-    return OptimizeRouteResult(**result).dict()
+    return OptimizeRouteResult(**result).model_dump()
 
 
 def _fallback_simulate_transaction(step: Dict[str, Any]) -> Dict[str, Any]:
@@ -96,7 +96,7 @@ def decode_transaction(tx: Any) -> Dict[str, Any]:
     if isinstance(tx, str) and _platform_rust is not None and hasattr(_platform_rust, "decode_transaction"):
         try:
             decoded = _platform_rust.decode_transaction(tx)
-            return DecodedTransaction.parse_obj(decoded).dict(by_alias=True)
+            return DecodedTransaction.model_validate(decoded).model_dump(by_alias=True)
         except Exception as e:
             logger.error("Native decode_transaction failed, falling back", error=str(e))
             # fall through to fallback below
@@ -109,12 +109,12 @@ def optimize_route(params: Dict[str, Any]) -> Dict[str, Any]:
         try:
             # If the native module exposes an ExecutionEngine class, instantiate and call optimize_route
             engine = _platform_rust.ExecutionEngine()
-            result = engine.optimize_route(parsed.dict())
-            return OptimizeRouteResult.parse_obj(result).dict()
+            result = engine.optimize_route(parsed.model_dump())
+            return OptimizeRouteResult.model_validate(result).model_dump()
         except Exception as e:
             logger.error("Native optimize_route failed, falling back", error=str(e))
-            return _fallback_optimize_route(parsed.dict())
-    return _fallback_optimize_route(parsed.dict())
+            return _fallback_optimize_route(parsed.model_dump())
+    return _fallback_optimize_route(parsed.model_dump())
 
 
 def simulate_transaction(step: Dict[str, Any]) -> Dict[str, Any]:
@@ -130,11 +130,11 @@ def simulate_transaction(step: Dict[str, Any]) -> Dict[str, Any]:
 
 def aggregate_order_books(books: List[Any]) -> Any:
     # Validate/normalize entries
-    entries = [AggregateOrderBookEntry.parse_obj(b).dict() for b in books]
+    entries = [AggregateOrderBookEntry.model_validate(b).model_dump() for b in books]
     if _platform_rust is not None and hasattr(_platform_rust, "aggregate_order_books"):
         try:
             result = _platform_rust.aggregate_order_books(entries)
-            return AggregateOrderBooksOutput.parse_obj(result).dict()
+            return AggregateOrderBooksOutput.model_validate(result).model_dump()
         except Exception as e:
             logger.error("Native aggregate_order_books failed, falling back", error=str(e))
             return _fallback_aggregate_order_books(entries)

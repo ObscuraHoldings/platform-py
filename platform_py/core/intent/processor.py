@@ -164,7 +164,7 @@ class DistributedIntentPipeline:
     
     def __init__(self, num_processors: int = 4):
         if not ray.is_initialized():
-            ray.init(address=config.ray.address or 'auto')
+            ray.init(address=config.ray.address)
         
         self.num_processors = num_processors
         self.processors = [IntentProcessor.remote(f"processor_{i}") for i in range(num_processors)]

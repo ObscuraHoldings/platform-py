@@ -1,4 +1,3 @@
-
 import asyncio
 import structlog
 from typing import Dict, Any, Optional
@@ -24,8 +23,10 @@ class ChainWatcher:
         self._poll_task: Optional[asyncio.Task] = None
 
     def _get_rpc_url(self) -> str:
-        # In a real implementation, this would fetch the RPC URL from config based on chain_id
-        return config.rpc_urls.get(self.chain_id, "")
+        url = config.get_rpc_url(self.chain_id)
+        if not url:
+            raise RuntimeError(f"No RPC URL configured for chain_id={self.chain_id}. Configure PLATFORM_NETWORK__* or PLATFORM_RPC_URLS.")
+        return url
 
     async def start(self):
         """Start the chain watcher."""

@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any, Union
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta
 
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 from .common import Asset, AssetAmount, TradingPair, Venue
 
@@ -79,27 +79,25 @@ class IntentConstraints(BaseModel):
     confidence_threshold: Optional[float] = Field(None, ge=0, le=1, description="ML confidence threshold")
     use_ml_optimization: bool = Field(default=True, description="Enable ML-based optimization")
     
-    @validator('max_fill_size')
-    def validate_fill_sizes(cls, v: Optional[Decimal], values: Dict[str, Any]) -> Optional[Decimal]:
+    @model_validator(mode='after')
+    def validate_fill_sizes(self) -> 'IntentConstraints':
         """Validate max_fill_size is greater than min_fill_size."""
-        if v is not None and 'min_fill_size' in values:
-            min_size = values['min_fill_size']
-            if min_size is not None and v < min_size:
+        if self.max_fill_size is not None and self.min_fill_size is not None:
+            if self.max_fill_size < self.min_fill_size:
                 raise ValueError("max_fill_size must be greater than min_fill_size")
-        return v
+        return self
     
-    @root_validator(skip_on_failure=True)
-    def validate_venue_constraints(cls, values):
+    @model_validator(mode='after')
+    def validate_venue_constraints(self):
         """Validate venue constraints don't conflict."""
-        allowed = values.get('allowed_venues', [])
-        excluded = values.get('excluded_venues', [])
+        allowed = self.allowed_venues or []
+        excluded = self.excluded_venues or []
         
         if allowed and excluded:
             overlap = set(allowed) & set(excluded)
             if overlap:
                 raise ValueError(f"Venues cannot be both allowed and excluded: {overlap}")
-        
-        return values
+        return self
 
 
 class AssetSpec(BaseModel):
@@ -110,18 +108,17 @@ class AssetSpec(BaseModel):
     percentage: Optional[Decimal] = Field(None, ge=0, le=1, description="Percentage of portfolio")
     target_weight: Optional[Decimal] = Field(None, ge=0, le=1, description="Target portfolio weight")
     
-    @root_validator(skip_on_failure=True)
-    def validate_amount_spec(cls, values):
+    @model_validator(mode='after')
+    def validate_amount_spec(self):
         """Ensure exactly one amount specification is provided."""
-        amount = values.get('amount')
-        percentage = values.get('percentage')
-        target_weight = values.get('target_weight')
+        amount = self.amount
+        percentage = self.percentage
+        target_weight = self.target_weight
         
         specified = sum(x is not None for x in [amount, percentage, target_weight])
         if specified != 1:
             raise ValueError("Exactly one of amount, percentage, or target_weight must be specified")
-        
-        return values
+        return self
 
 
 class MLFeatures(BaseModel):
@@ -164,7 +161,7 @@ class Intent(BaseModel):
     
     # Core intent data
     type: IntentType = Field(..., description="Intent type")
-    assets: List[AssetSpec] = Field(..., min_items=1, description="Assets to trade")
+    assets: List[AssetSpec] = Field(..., min_length=1, description="Assets to trade")
     constraints: IntentConstraints = Field(..., description="Execution constraints")
     
     # Priority and metadata
@@ -187,16 +184,16 @@ class Intent(BaseModel):
     average_price: Optional[Decimal] = Field(None, description="Average execution price")
     total_gas_used: Optional[Decimal] = Field(default=Decimal('0'), ge=0, description="Total gas used")
     
-    @validator('expires_at')
-    def validate_expiration(cls, v: Optional[datetime], values: Dict[str, Any]) -> Optional[datetime]:
+    @model_validator(mode='after')
+    def validate_expiration(self) -> 'Intent':
         """Validate expiration is in the future."""
-        if v is not None:
-            timestamp = values.get('timestamp', datetime.utcnow())
-            if v <= timestamp:
+        if self.expires_at is not None:
+            ts = self.timestamp or datetime.utcnow()
+            if self.expires_at <= ts:
                 raise ValueError("Expiration time must be in the future")
-        return v
+        return self
     
-    @validator('assets')
+    @field_validator('assets')
     def validate_assets_not_empty(cls, v: List[AssetSpec]) -> List[AssetSpec]:
         """Ensure assets list is not empty."""
         if not v:
